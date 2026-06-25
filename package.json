@@ -1,0 +1,16 @@
+{
+  "name": "synapse-map-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/cli",
+    "packages/app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/app && npm run build --workspace=packages/cli",
+    "dev:app": "npm run dev --workspace=packages/app",
+    "dev:cli": "npm run dev --workspace=packages/cli"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

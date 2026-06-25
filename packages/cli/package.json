@@ -1,0 +1,35 @@
+{
+  "name": "synapse-map",
+  "version": "0.1.0",
+  "description": "Transform your Claude Code conversations into a living knowledge graph",
+  "type": "module",
+  "bin": {
+    "synapse-map": "./dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "public/"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "compromise": "^14.14.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "open": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "tsx": "^4.15.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
