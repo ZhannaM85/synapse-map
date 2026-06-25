@@ -11,7 +11,7 @@ _Monorepo setup, core types, and data access. Must be done first — everything 
 |---|-------|-------|
 | ~~[#1](https://github.com/ZhannaM85/synapse-map/issues/1)~~ | ~~feat: initialize monorepo with npm workspaces (packages/cli + packages/app)~~ | ~~Start here — sets up the project structure~~ |
 | ~~[#2](https://github.com/ZhannaM85/synapse-map/issues/2)~~ | ~~feat: define core TypeScript interfaces (GraphNode, GraphEdge, KnowledgeGraph)~~ | ~~Do immediately after #1 — all other modules depend on these types~~ |
-| [#3](https://github.com/ZhannaM85/synapse-map/issues/3) | feat: implement JSONL reader — getAllSessions and parseSession | Reads ~/.claude/projects/ conversation history |
+| ~~[#3](https://github.com/ZhannaM85/synapse-map/issues/3)~~ | ~~feat: implement JSONL reader — getAllSessions and parseSession~~ | ~~Reads ~/.claude/projects/ conversation history~~ |
 | [#4](https://github.com/ZhannaM85/synapse-map/issues/4) | feat: implement SQLite storage layer with FTS5 (better-sqlite3) | Persists the graph; required by scan, serve, status, reset |
 
 ---
