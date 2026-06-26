@@ -259,32 +259,80 @@ erDiagram
 
 ---
 
+## Server Layer (`packages/cli/src/server/`)
+
+Added in issue #11. Exposes the SQLite graph over HTTP so the React frontend and browser-triggered scans can communicate with the CLI process.
+
+### `packages/cli/src/server/app.ts`
+**Why it exists:** Factory that builds and configures the Express application. Separating app creation from server startup (`app.ts` vs a future `serve.ts`) keeps the API layer testable without binding to a port.
+
+| Export | Purpose |
+|--------|---------|
+| `createApp()` | Creates an Express app with `cors()` + `express.json()` middleware, mounts all four route groups at `/api/*`, and returns the configured app. |
+
+Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api/status` → status · `/api/scan` → scan trigger + SSE.
+
+---
+
+### `packages/cli/src/server/routes/graph.ts`
+**Why it exists:** Primary data endpoint. The React frontend fetches the full graph on load and navigates to individual nodes on click.
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/graph` | Full `KnowledgeGraph` JSON — nodes, edges, processedSessions. |
+| `GET /api/graph/nodes` | All nodes as an array. Accepts `?type=concept` to filter by node type. |
+| `GET /api/graph/nodes/:id` | Single node by slug + all connected edges. Returns 404 if not found. |
+| `GET /api/graph/edges` | All edges. Accepts `?minWeight=N` to return only heavily co-occurring pairs. |
+
+---
+
+### `packages/cli/src/server/routes/search.ts`
+**Why it exists:** Powers the search bar in the UI. Delegates directly to `searchNodes()` in `store.ts`, which runs an FTS5 prefix-match query — no in-process filtering needed.
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/search?q=react` | Returns up to 20 nodes whose labels prefix-match the query. Returns 400 if `q` is missing or empty. |
+
+---
+
+### `packages/cli/src/server/routes/status.ts`
+**Why it exists:** Lightweight stats endpoint. The CLI's `synapse status` command and the UI header badge call this to display counts without loading the full graph into memory.
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/status` | Returns `{ nodeCount, edgeCount, sessionCount, lastUpdated }` derived from `loadGraph()`. |
+
+---
+
+### `packages/cli/src/server/routes/scan.ts`
+**Why it exists:** Enables browser-triggered re-scans and real-time progress feedback over Server-Sent Events. SSE was chosen over WebSockets because it's server-to-client only, requires no extra package, and auto-reconnects.
+
+| Route | Purpose |
+|-------|---------|
+| `POST /api/scan` | Starts `runScan()` in a `setTimeout(..., 0)` so the 202 response is sent before the scan begins. Returns 409 if already running. |
+| `GET /api/scan/progress` | Opens an SSE stream. Clients receive `started`, `completed`, or `error` events. Connection `close` event removes the client from `sseClients`. |
+
+**Key internals:** `scanInProgress` (boolean flag) prevents concurrent scans. `sseClients` (Set of Response objects) allows broadcasting to multiple open browser tabs simultaneously.
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done"]
+    subgraph Done ["✅ Done (#1–#11)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
         T4["#4 SQLite Store"]
-        T5["#5 Vocabulary"]
-        T6["#6 TF-IDF"]
-        T7["#7 NLP"]
+        T5["#5–#7 Extractors"]
         T8["#8 RuleBasedExtractor"]
         T9["#9 Merge Algorithm"]
         T10["#10 Scan Command"]
+        T11["#11 Express API"]
     end
 
-    subgraph Tier4 ["🔨 Tier 4 — Server + CLI"]
-        T11["#11 Express API"]
-        T12["#12 Serve Command"]
-        T13["#13 Status + Reset"]
-        T14["#14 CLI Entry Point"]
-    end
-
-    subgraph Tier4 ["⬜ Tier 4 — Server + CLI"]
-        T11["#11 Express API"]
+    subgraph Tier4 ["🔨 Tier 4 — Remaining CLI"]
         T12["#12 Serve Command"]
         T13["#13 Status + Reset"]
         T14["#14 CLI Entry Point"]
@@ -294,5 +342,5 @@ flowchart LR
         T15["#15–21 Frontend"]
     end
 
-    Done --> InProgress --> Tier3 --> Tier4 --> Tier5
+    Done --> Tier4 --> Tier5
 ```

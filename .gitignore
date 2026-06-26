@@ -6,3 +6,4 @@ packages/cli/public/
 .env
 .env.local
 .mouse-fixes/
+logs/
