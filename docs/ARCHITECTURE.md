@@ -316,6 +316,22 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 
 ---
 
+### `packages/cli/src/index.ts`
+**Why it exists:** The single entry point for the entire CLI. Uses Commander.js to define the `synapse` command with four subcommands (`scan`, `serve`, `status`, `reset`), so users interact with one unified binary rather than separate scripts. Also implements zero-config default behavior: running `synapse` with no arguments auto-scans (if no database exists) then launches the web UI — the most common workflow in a single keystroke.
+
+| Export / Behavior | Purpose |
+|-------------------|---------|
+| `program` (Commander instance) | Root command named `synapse` with version `0.1.0`. Delegates to subcommand handlers from `commands/`. |
+| `synapse scan` | `--force` re-processes all sessions; `--dry-run` previews without writing. Delegates to `runScan()`. |
+| `synapse serve` | `-p, --port <number>` (default 4242); `--no-open` suppresses browser launch. Delegates to `runServe()`. |
+| `synapse status` | No options. Delegates to `runStatus()`. |
+| `synapse reset` | No options. Delegates to `runReset()`. |
+| Default (no subcommand) | Checks `process.argv.length <= 2`. If no DB exists, calls `runScan()` first, then always calls `runServe()`. Skips `program.parse()` entirely so Commander doesn't print help. |
+
+**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js" }`, so `npm install -g` or `npx` makes the `synapse` command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix.
+
+---
+
 ### `packages/cli/src/commands/serve.ts`
 **Why it exists:** The user-facing entry point for the graph UI. Wires the Express API (`createApp()`) together with static file serving so the single `synapse serve` command starts the full stack — API + pre-built React frontend — in one process.
 
@@ -348,7 +364,7 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#13)"]
+    subgraph Done ["✅ Done (#1–#14)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -360,9 +376,6 @@ flowchart LR
         T11["#11 Express API"]
         T12["#12 Serve Command"]
         T13["#13 Status + Reset"]
-    end
-
-    subgraph Next ["🔨 Up Next"]
         T14["#14 CLI Entry Point"]
     end
 
@@ -370,5 +383,5 @@ flowchart LR
         T15["#15–21 Frontend"]
     end
 
-    Done --> Next --> Tier5
+    Done --> Tier5
 ```
