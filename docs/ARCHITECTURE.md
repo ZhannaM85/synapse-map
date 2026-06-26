@@ -316,11 +316,39 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 
 ---
 
+### `packages/cli/src/commands/serve.ts`
+**Why it exists:** The user-facing entry point for the graph UI. Wires the Express API (`createApp()`) together with static file serving so the single `synapse serve` command starts the full stack — API + pre-built React frontend — in one process.
+
+| Export | Purpose |
+|--------|---------|
+| `ServeOptions` | `{ port?, open? }` — port defaults to 4242; `open` defaults to `true`. |
+| `runServe(options)` | Creates the Express app, mounts `packages/cli/public/` as a static directory (where the Vite build will output the React app), starts listening, logs the URL, and auto-opens the browser via the `open` package. |
+
+---
+
+### `packages/cli/src/commands/status.ts`
+**Why it exists:** Quick health check — shows what's in the graph without starting a server. Useful to verify a scan completed correctly or to see the graph size before opening the UI.
+
+| Export | Purpose |
+|--------|---------|
+| `runStatus()` | Loads the graph from SQLite, counts nodes by type (`concept` / `project`), counts edges and sessions, finds the latest `processedAt` timestamp, and prints a four-line summary to stdout. Exits early with a friendly message if no database exists yet. |
+
+---
+
+### `packages/cli/src/commands/reset.ts`
+**Why it exists:** Safety valve for clearing a corrupted or stale graph without touching the user's source files. The confirmation prompt prevents accidental data loss since the SQLite database is the only copy of the indexed graph.
+
+| Export | Purpose |
+|--------|---------|
+| `runReset()` | Checks whether `~/.synapse/graph.db` exists, then prompts `[y/N]` for confirmation. On `y`: calls `closeDb()` to release the SQLite connection, then `unlinkSync` to delete the file. Prints "Aborted." on anything else. |
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#11)"]
+    subgraph Done ["✅ Done (#1–#13)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -330,11 +358,11 @@ flowchart LR
         T9["#9 Merge Algorithm"]
         T10["#10 Scan Command"]
         T11["#11 Express API"]
-    end
-
-    subgraph Tier4 ["🔨 Tier 4 — Remaining CLI"]
         T12["#12 Serve Command"]
         T13["#13 Status + Reset"]
+    end
+
+    subgraph Next ["🔨 Up Next"]
         T14["#14 CLI Entry Point"]
     end
 
@@ -342,5 +370,5 @@ flowchart LR
         T15["#15–21 Frontend"]
     end
 
-    Done --> Tier4 --> Tier5
+    Done --> Next --> Tier5
 ```
