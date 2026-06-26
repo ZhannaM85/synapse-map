@@ -22,8 +22,8 @@ _No LLM, no API key. Three layers combined into a single pluggable interface. #5
 | # | Issue | Notes |
 |---|-------|-------|
 | ~~[#5](https://github.com/ZhannaM85/synapse-map/issues/5)~~ | ~~feat: build tech vocabulary list (~800 terms) for vocabulary matching~~ | ~~Standalone — highest-confidence extraction layer~~ |
-| [#6](https://github.com/ZhannaM85/synapse-map/issues/6) | feat: implement TF-IDF extractor across conversation corpus | Standalone — surfaces project-specific terms |
-| [#7](https://github.com/ZhannaM85/synapse-map/issues/7) | feat: integrate compromise.js for noun phrase extraction | Standalone — catches concepts vocabulary misses |
+| ~~[#6](https://github.com/ZhannaM85/synapse-map/issues/6)~~ | ~~feat: implement TF-IDF extractor across conversation corpus~~ | ~~Standalone — surfaces project-specific terms~~ |
+| ~~[#7](https://github.com/ZhannaM85/synapse-map/issues/7)~~ | ~~feat: integrate compromise.js for noun phrase extraction~~ | ~~Standalone — catches concepts vocabulary misses~~ |
 | [#8](https://github.com/ZhannaM85/synapse-map/issues/8) | feat: implement Extractor interface and RuleBasedExtractor combining all three layers | Depends on #5, #6, #7 — also defines the interface for future LLM backends |
 
 ---
