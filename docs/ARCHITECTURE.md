@@ -407,14 +407,36 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 ---
 
 ### `packages/app/src/components/ConceptNode.tsx`
-**Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via size, selection/hover via glow — so users can scan the canvas and immediately spot important or related concepts without reading labels.
+**Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via card size and badge, selection/hover via border glow — so users can scan the canvas and immediately spot important or related concepts without reading labels. Rebuilt in #18 to use shadcn Card + Badge instead of raw circles, giving each node a readable label and weight indicator.
 
 | Export | Purpose |
 |--------|---------|
 | `ConceptNodeData` (type) | Shape of the data payload each React Flow node carries: `label`, `type`, `weight`, `highlighted`, `expanded`. Used by `GraphCanvas` when building the `Node<ConceptNodeData>[]` array. |
-| `default` (memoised component) | Renders a circular node with: size scaled by `weight` (28–68 px), colour from `TYPE_COLORS` lookup keyed on `type`, highlight glow when hovered/selected, and a small dot indicator when the node is expanded (neighbours revealed). Hidden handles on top/bottom connect edges without visible anchors. |
+| `default` (memoised component) | Renders a `Card` whose width scales with `weight` (40–120 px, clamped 1–20). Inside: title-cased label with scaled font size (9–13 px), a `Badge` showing the numeric weight (size/variant shift at thresholds 3, 5, 10), and a coloured dot indicating node type. Highlight state intensifies the border and adds a box-shadow glow. An absolute-positioned dot below the card signals the "expanded" state. Hidden handles on top/bottom connect edges without visible anchors. Wrapped in `memo` to avoid re-renders when siblings change. |
 
-**Colour palette:** `concept` → indigo, `function` → violet, `class` → purple, `module` → blue, `file` → cyan, `variable` → teal, `type` → amber, `interface` → orange. Falls back to slate for unknown types.
+**Colour palette:** `concept` → indigo, `project` → emerald, `function` → violet, `class` → purple, `module` → blue, `file` → cyan, `variable` → teal, `type` → amber, `interface` → orange. Falls back to slate for unknown types.
+
+**Internal helpers:** `toTitleCase(str)` capitalises the first letter of each word for display labels. `TYPE_COLORS` is a plain `Record<string, string>` mapping type slugs to hex colours.
+
+---
+
+### `packages/app/src/components/ui/card.tsx`
+**Why it exists:** shadcn/ui Card primitive used by `ConceptNode` as the visual container for each graph node. Extracted as a shared component so future UI surfaces (sidebar panels, detail views) can reuse the same card styling and dark-mode tokens.
+
+| Export | Purpose |
+|--------|---------|
+| `Card` | `forwardRef` div with rounded border, `bg-card` background, and subtle shadow. Accepts standard HTML div props + `className` overrides via `cn()`. |
+| `CardContent` | Inner content wrapper with default `p-3` padding. `ConceptNode` overrides this to `p-1.5` for compact graph nodes. |
+
+---
+
+### `packages/app/src/components/ui/badge.tsx`
+**Why it exists:** shadcn/ui Badge primitive that displays the numeric weight inside each `ConceptNode`. Uses `class-variance-authority` (CVA) for type-safe variant/size combinations, keeping conditional class logic out of the node component.
+
+| Export | Purpose |
+|--------|---------|
+| `Badge` | Renders a rounded pill `<div>` with variant (`default`, `secondary`, `outline`) and size (`sm`, `default`, `lg`) props. `ConceptNode` selects variant/size based on weight thresholds to visually distinguish low- vs high-weight nodes. |
+| `badgeVariants` | CVA definition exported for reuse — callers can generate badge class strings without rendering a component (e.g. for server-side or utility contexts). |
 
 ---
 
@@ -442,11 +464,37 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 ---
 
+### `packages/app/src/index.css`
+**Why it exists:** Defines the dark-mode design tokens (CSS custom properties) that shadcn/ui components consume. Centralising colour definitions here — rather than in Tailwind config or inline styles — means swapping themes or adding a light mode requires editing one file.
+
+| Token | Purpose |
+|-------|---------|
+| `--background` / `--foreground` | Page-level colours (deep navy background, near-white text). |
+| `--card` / `--card-foreground` | Card surface colours — currently match `--background` so cards blend with the canvas. |
+| `--muted` / `--muted-foreground` | Subdued text and surfaces (type labels, secondary info). |
+| `--border` | Default border colour applied globally via `* { border-color }`. |
+| `--ring` | Focus-ring colour (indigo) for keyboard-accessible components. |
+| `--radius` | Base border-radius (`0.5rem`) consumed by Tailwind's `rounded-lg/md/sm` utilities. |
+
+---
+
+### `packages/app/tailwind.config.js`
+**Why it exists:** Extends the default Tailwind theme to wire up the CSS custom properties from `index.css` as first-class Tailwind utilities (`bg-card`, `text-muted-foreground`, `rounded-lg`, etc.), so shadcn/ui components work correctly. Also defines the `node-appear` animation used by `ConceptNode` for smooth entry transitions.
+
+| Extension | Purpose |
+|-----------|---------|
+| `colors.*` | Maps semantic names (`background`, `foreground`, `card`, `muted`, `border`, `ring`) to `hsl(var(--*))` so Tailwind classes resolve to the CSS tokens. |
+| `borderRadius.*` | Derives `lg`, `md`, `sm` from `--radius` so all rounded corners stay in sync. |
+| `keyframes.node-appear` | Scale-up + fade-in animation (0.8 → 1 scale, 0 → 1 opacity) over 0.3s ease-out. |
+| `animation.node-appear` | Shorthand class `animate-node-appear` applied by `ConceptNode`'s Card wrapper. |
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#17)"]
+    subgraph Done ["✅ Done (#1–#18)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -462,10 +510,11 @@ flowchart LR
         T15["#15 Scaffold Frontend"]
         T16["#16 Zustand Store"]
         T17["#17 React Flow Canvas"]
+        T18["#18 Custom ConceptNode"]
     end
 
     subgraph Tier5 ["⬜ Tier 5 — React UI (remaining)"]
-        T18["#18–21 Frontend"]
+        T19["#19–21 Frontend"]
     end
 
     Done --> Tier5
