@@ -25,11 +25,12 @@ import {
 import { useGraphStore, type GraphNode, type GraphEdge } from '../store/graphStore.js';
 import ConceptNode, { type ConceptNodeData } from './ConceptNode.js';
 
+// Higher zoom = fewer, more important nodes (like Google Maps: zoom in = your city, zoom out = whole world)
 const LOD_LEVELS = [
-    { maxZoom: 0.4, nodeWeight: 80, edgeWeight: 20 }, // LOD 0 — Hubs (~18 nodes, ~39 edges)
-    { maxZoom: 0.7, nodeWeight: 40, edgeWeight: 10 }, // LOD 1 — Overview (~65 nodes, ~215 edges)
-    { maxZoom: 1.2, nodeWeight: 15, edgeWeight: 5  }, // LOD 2 — Detail (~135 nodes, ~863 edges)
-    { maxZoom: Infinity, nodeWeight: 5, edgeWeight: 2 }, // LOD 3 — Deep (~641 nodes)
+    { maxZoom: 0.4, nodeWeight: 5,  edgeWeight: 1 }, // LOD 0 — far out → ~641 nodes as dots
+    { maxZoom: 0.8, nodeWeight: 15, edgeWeight: 2 }, // LOD 1 — overview → ~135 nodes
+    { maxZoom: 1.3, nodeWeight: 40, edgeWeight: 5 }, // LOD 2 — detail → ~65 nodes
+    { maxZoom: Infinity, nodeWeight: 90, edgeWeight: 10 }, // LOD 3 — close-up → ~10 hubs
 ] as const;
 
 const nodeTypes = { concept: ConceptNode };
@@ -37,6 +38,9 @@ const nodeTypes = { concept: ConceptNode };
 interface ForceNode extends SimulationNodeDatum {
     id: string;
 }
+
+const LAYOUT_WIDTH = 900;
+const LAYOUT_HEIGHT = 650;
 
 function computeLayout(
     graphNodes: GraphNode[],
@@ -55,17 +59,31 @@ function computeLayout(
     const sim = forceSimulation(simNodes)
         .force(
             'link',
-            forceLink<ForceNode, SimulationLinkDatum<ForceNode>>(simLinks).id((d) => d.id).distance(120),
+            forceLink<ForceNode, SimulationLinkDatum<ForceNode>>(simLinks).id((d) => d.id).distance(80),
         )
-        .force('charge', forceManyBody().strength(-300))
+        .force('charge', forceManyBody().strength(-150))
         .force('center', forceCenter(0, 0))
-        .force('collide', forceCollide(40))
+        .force('collide', forceCollide(30))
         .stop();
 
     for (let i = 0; i < 300; i++) sim.tick();
 
+    // Normalize all positions to fit within LAYOUT_WIDTH × LAYOUT_HEIGHT
+    const xs = simNodes.map((n) => n.x ?? 0);
+    const ys = simNodes.map((n) => n.y ?? 0);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const spanX = maxX - minX || 1;
+    const spanY = maxY - minY || 1;
+    const scale = Math.min(LAYOUT_WIDTH / spanX, LAYOUT_HEIGHT / spanY);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
     for (const node of simNodes) {
-        positions.set(node.id, { x: node.x ?? 0, y: node.y ?? 0 });
+        positions.set(node.id, {
+            x: ((node.x ?? 0) - cx) * scale,
+            y: ((node.y ?? 0) - cy) * scale,
+        });
     }
 
     return positions;
@@ -245,7 +263,7 @@ function GraphCanvasInner() {
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}
             onPaneClick={onPaneClick}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+            defaultViewport={{ x: 0, y: 0, zoom: 1.5 }}
             minZoom={0.05}
             maxZoom={4}
             proOptions={{ hideAttribution: true }}
