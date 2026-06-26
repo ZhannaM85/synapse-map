@@ -214,6 +214,7 @@ function GraphCanvasInner() {
                     id: n.id,
                     type: 'concept' as const,
                     position: pos,
+                    zIndex: n.id === hoveredNodeId ? 1000 : 1,
                     data: {
                         label: n.label,
                         type: n.type,
