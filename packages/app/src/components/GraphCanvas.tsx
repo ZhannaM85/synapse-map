@@ -82,8 +82,8 @@ function GraphCanvasInner() {
 
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-    const layoutCache = useRef<Map<string, { x: number; y: number }>>(new Map());
-    const fittedLod = useRef<number | null>(null);
+    const [layoutPositions, setLayoutPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+    const prevLodRef = useRef<number | null>(null);
 
     useEffect(() => {
         loadGraph();
@@ -146,15 +146,21 @@ function GraphCanvasInner() {
     useEffect(() => {
         if (visibleNodes.length === 0) return;
         const positions = computeLayout(visibleNodes, visibleEdges);
-        for (const [id, pos] of positions) {
-            layoutCache.current.set(id, pos);
-        }
+        setLayoutPositions(new Map(positions));
     }, [visibleNodes, visibleEdges]);
+
+    // fitView once per LOD level, after layout positions are ready
+    useEffect(() => {
+        if (layoutPositions.size === 0) return;
+        if (prevLodRef.current === lod) return;
+        prevLodRef.current = lod;
+        setTimeout(() => fitView({ padding: 0.2, duration: 600 }), 50);
+    }, [layoutPositions, lod, fitView]);
 
     const flowNodes: Node<ConceptNodeData>[] = useMemo(
         () =>
             visibleNodes.map((n) => {
-                const pos = layoutCache.current.get(n.id) ?? { x: 0, y: 0 };
+                const pos = layoutPositions.get(n.id) ?? { x: 0, y: 0 };
                 const highlighted =
                     hoveredNodeId !== null
                         ? connectedToHovered.has(n.id)
@@ -173,7 +179,7 @@ function GraphCanvasInner() {
                     },
                 };
             }),
-        [visibleNodes, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod],
+        [visibleNodes, layoutPositions, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod],
     );
 
     const maxWeight = useMemo(
@@ -202,12 +208,6 @@ function GraphCanvasInner() {
         [visibleEdges, maxWeight, connectedEdgeIds, hoveredNodeId],
     );
 
-    useEffect(() => {
-        if (flowNodes.length > 0 && fittedLod.current !== lod) {
-            fittedLod.current = lod;
-            setTimeout(() => fitView({ padding: 0.2, duration: 600 }), 100);
-        }
-    }, [lod, flowNodes.length]);
 
     const onNodeClick: NodeMouseHandler = useCallback(
         (_event, node) => {
