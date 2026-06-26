@@ -5,6 +5,7 @@ import {
     Background,
     Controls,
     MiniMap,
+    Panel,
     useReactFlow,
     useViewport,
     type Node,
@@ -285,6 +286,13 @@ function GraphCanvasInner() {
         setExpandedIds(new Set());
     }, [selectNode]);
 
+    const resetView = useCallback(() => {
+        selectNode(null);
+        setExpandedIds(new Set());
+        hasInitialFit.current = false;
+        setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+    }, [selectNode, fitView]);
+
     return (
         <ReactFlow
             nodes={flowNodes}
@@ -302,6 +310,16 @@ function GraphCanvasInner() {
         >
             <Background gap={20} size={1} color="#334155" />
             <Controls showInteractive={false} />
+            {expandedIds.size > 0 && (
+                <Panel position="top-left">
+                    <button
+                        onClick={resetView}
+                        className="rounded-md border border-border bg-muted px-3 py-1.5 text-xs text-foreground shadow transition-colors hover:bg-ring/20"
+                    >
+                        ← Back to hub view
+                    </button>
+                </Panel>
+            )}
             <MiniMap
                 pannable
                 zoomable
