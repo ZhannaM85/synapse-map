@@ -83,6 +83,7 @@ function GraphCanvasInner() {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const layoutCache = useRef<Map<string, { x: number; y: number }>>(new Map());
+    const fittedLod = useRef<number | null>(null);
 
     useEffect(() => {
         loadGraph();
@@ -202,10 +203,11 @@ function GraphCanvasInner() {
     );
 
     useEffect(() => {
-        if (flowNodes.length > 0) {
-            setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 50);
+        if (flowNodes.length > 0 && fittedLod.current !== lod) {
+            fittedLod.current = lod;
+            setTimeout(() => fitView({ padding: 0.2, duration: 600 }), 100);
         }
-    }, [flowNodes.length > 0]);
+    }, [lod, flowNodes.length]);
 
     const onNodeClick: NodeMouseHandler = useCallback(
         (_event, node) => {
@@ -244,8 +246,8 @@ function GraphCanvasInner() {
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseLeave={onNodeMouseLeave}
             onPaneClick={onPaneClick}
-            fitView
-            minZoom={0.1}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+            minZoom={0.05}
             maxZoom={4}
             proOptions={{ hideAttribution: true }}
             className="bg-background"
