@@ -21,6 +21,23 @@ const STOPWORDS = new Set([
   'export','return','const','let','var','class','interface','extends',
   'implements','if','else','while','for','switch','case','break',
   'continue','new','delete','typeof','instanceof','void',
+  // Common conversational / UI words that don't carry technical meaning
+  'pick','click','press','open','close','scroll','drag','drop','hover',
+  'select','focus','down','up','back','left','right','front','side',
+  'just','also','now','here','there','still','again','often','always',
+  'never','maybe','perhaps','actually','really','basically','simply',
+  'please','thanks','thank','sure','okay','right','wrong','good','bad',
+  'say','said','says','tell','told','ask','asked','help','show','shows',
+  'showing','shown','put','puts','set','sets','call','calls','called',
+  'give','gives','gave','given','find','found','found','keep','kept',
+  'mean','means','meant','feel','feels','felt','seem','seems','seemed',
+  'check','move','turn','start','stop','end','begin','began',
+  // Claude Code conversation meta-terms (not technical topics)
+  'session','sessions','conversation','conversations','response','responses',
+  'output','input','task','tasks','note','notes','prompt','prompts',
+  // Contraction artifacts (apostrophes stripped by tokenizer: "doesn't" → "doesn")
+  'doesn','isn','aren','wasn','weren','can','won','wouldn','couldn',
+  'shouldn','haven','hasn','don','let','didn','mustn','needn',
 ]);
 
 function tokenize(text: string): string[] {

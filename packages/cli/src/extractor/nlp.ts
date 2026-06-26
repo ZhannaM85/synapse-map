@@ -14,6 +14,8 @@ const NLP_STOPWORDS = new Set([
   'anything','nothing','someone','everyone','anyone','later','first',
   'second','third','next','previous','current','new','old','good','bad',
   'right','wrong','true','false','yes','no','ok','okay',
+  'session','sessions','conversation','conversations','response','responses',
+  'output','input','command','commands','task','tasks','note','notes',
 ]);
 
 function toTitleCase(str: string): string {
@@ -24,9 +26,10 @@ function isUsefulPhrase(phrase: string): boolean {
   const lower = phrase.toLowerCase().trim();
   if (lower.length < 3) return false;
   if (NLP_STOPWORDS.has(lower)) return false;
-  // Skip phrases that are purely numeric or single common letters
   if (/^\d+$/.test(lower)) return false;
-  // Skip phrases longer than 4 words — too specific to be a reusable topic
+  // Skip article-leading phrases ("A Session", "The Thing")
+  if (/^(a|an|the)\s/i.test(lower)) return false;
+  // Skip phrases longer than 4 words
   if (lower.split(/\s+/).length > 4) return false;
   return true;
 }
@@ -38,12 +41,14 @@ export function extractNounPhrases(text: string): string[] {
 
   // Multi-word noun phrases (e.g. "knowledge graph", "force directed layout")
   doc.nouns().out('array').forEach((p: string) => {
+    if (p.includes("'") || p.includes('’')) return; // skip contractions ("doesn't")
     const clean = p.trim().replace(/[^a-zA-Z0-9\s\-_.]/g, '').trim();
     if (isUsefulPhrase(clean)) phrases.add(toTitleCase(clean));
   });
 
   // Proper nouns — highest confidence single terms
   doc.match('#ProperNoun+').out('array').forEach((p: string) => {
+    if (p.includes("'") || p.includes('’')) return;
     const clean = p.trim().replace(/[^a-zA-Z0-9\s\-_.]/g, '').trim();
     if (isUsefulPhrase(clean)) phrases.add(toTitleCase(clean));
   });

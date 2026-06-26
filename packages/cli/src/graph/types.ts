@@ -58,6 +58,12 @@ export interface ExtractionResult {
   projects: string[];          // project names inferred from cwd or message content
 }
 
+// ── Extractor interface (pluggable — LLM backends will implement this too) ────
+
+export interface Extractor {
+  extract(session: ParsedSession): ExtractionResult;
+}
+
 // ── Graph builder helpers ─────────────────────────────────────────────────────
 
 export function emptyGraph(): KnowledgeGraph {

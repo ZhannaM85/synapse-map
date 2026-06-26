@@ -135,6 +135,46 @@ No model download — compromise is pure JavaScript, works fully offline.
 
 ---
 
+### `packages/cli/src/extractor/index.ts`
+**Why it exists:** Public barrel for the extractor subsystem. Re-exports the `Extractor` interface and `RuleBasedExtractor` so callers only need one import path. Future LLM extractors will also be exported here without callers changing their imports.
+
+| Export | Purpose |
+|--------|---------|
+| `Extractor` (re-export) | The interface — re-exported from `graph/types.ts` for convenience. |
+| `RuleBasedExtractor` (re-export) | The default extractor implementation. |
+
+---
+
+### `packages/cli/src/extractor/rule-based.ts`
+**Why it exists:** Combines all three extraction layers (vocabulary, TF-IDF, NLP) into a single class that implements the `Extractor` interface. This is the default engine for phase 1.
+
+| Export | Purpose |
+|--------|---------|
+| `RuleBasedExtractor` | Class that wraps all three extraction layers. Constructor takes the full list of parsed sessions so it can build the TF-IDF corpus up front. `extract(session)` runs all three layers, normalises results through the alias table and vocabulary canonical forms, and returns the deduped `ExtractionResult`. |
+
+**How layers are combined:**
+1. **Layer 1 (vocabulary)** — 391 precompiled regex patterns, run against the full message text. Fastest, highest confidence.
+2. **Layer 2 (TF-IDF)** — up to 20 high-scoring tokens per session. Each token is normalised: aliases table → vocabulary canonical → title-case unknown words.
+3. **Layer 3 (NLP)** — compromise noun phrases from the first 8000 chars of message text (capped for speed). Same normalisation pipeline.
+
+All three layers write into a single `Set<string>` so deduplication is free. Project name is extracted from the last path segment of `session.cwd`.
+
+Also includes `escapeRe()` (local helper for building vocab regex) and `normalizeToken()` (alias → vocab → title-case pipeline, filters tokens < 3 chars).
+
+---
+
+### `packages/cli/src/graph/types.ts` — `Extractor` interface (added in #8)
+
+```typescript
+export interface Extractor {
+  extract(session: ParsedSession): ExtractionResult;
+}
+```
+
+Added to `types.ts` so the interface lives with its input/output types. Future LLM extractors (`OllamaExtractor`, `AnthropicExtractor`) will implement this interface — the scan command only ever sees `Extractor`, not the concrete class.
+
+---
+
 ### `packages/cli/src/graph/store.ts`
 **Why it exists:** All graph data is persisted in a local SQLite database at `~/.synapse/graph.db`. This module is the only place that reads from or writes to that database.
 
@@ -199,13 +239,10 @@ flowchart LR
         T5["#5 Vocabulary"]
         T6["#6 TF-IDF"]
         T7["#7 NLP"]
-    end
-
-    subgraph InProgress ["🔨 Tier 2 — Extraction"]
         T8["#8 RuleBasedExtractor"]
     end
 
-    subgraph Tier3 ["⬜ Tier 3 — Graph Builder + Scan"]
+    subgraph Tier3 ["🔨 Tier 3 — Graph Builder + Scan"]
         T9["#9 Merge Algorithm"]
         T10["#10 Scan Command"]
     end
