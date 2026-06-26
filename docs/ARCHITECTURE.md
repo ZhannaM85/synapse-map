@@ -187,6 +187,26 @@ Added to `types.ts` so the interface lives with its input/output types. Future L
 
 ---
 
+### `packages/cli/src/commands/scan.ts`
+**Why it exists:** The top-level orchestrator for the indexing pipeline. Wires together every lower-level module — reader, extractor, builder, store — into the single user-facing `synapse-map scan` workflow.
+
+| Export | Purpose |
+|--------|---------|
+| `runScan(options)` | Discovers all `.jsonl` files, hashes each one, skips already-indexed sessions, parses the full corpus for TF-IDF accuracy, extracts topics per session, merges into the graph, and saves to SQLite. Accepts `{ force, dryRun }` options. |
+
+**Incremental scan flow:**
+1. Quick-filter using `basename(filePath)` as a proxy sessionId + SHA-256 hash → skip if already indexed
+2. Parse ALL sessions into memory (needed for TF-IDF corpus quality)
+3. Build `RuleBasedExtractor` from the full corpus
+4. For each new/changed session: `extract` → `mergeSession` → accumulate in the in-memory graph
+5. `saveGraph` once at the end (single transaction)
+
+The secondary `isSessionProcessed(session.sessionId, hash)` check after parsing handles the rare case where a file's basename doesn't match its internal sessionId.
+
+**Tested against 148 real sessions**: 145 parsed successfully, full scan produces ~5,844 nodes and ~16,726 edges in ~18s. Re-scan correctly skips already-indexed sessions.
+
+---
+
 ### `packages/cli/src/graph/store.ts`
 **Why it exists:** All graph data is persisted in a local SQLite database at `~/.synapse/graph.db`. This module is the only place that reads from or writes to that database.
 
@@ -253,10 +273,14 @@ flowchart LR
         T7["#7 NLP"]
         T8["#8 RuleBasedExtractor"]
         T9["#9 Merge Algorithm"]
+        T10["#10 Scan Command"]
     end
 
-    subgraph Tier3 ["🔨 Tier 3 — Scan Command"]
-        T10["#10 Scan Command"]
+    subgraph Tier4 ["🔨 Tier 4 — Server + CLI"]
+        T11["#11 Express API"]
+        T12["#12 Serve Command"]
+        T13["#13 Status + Reset"]
+        T14["#14 CLI Entry Point"]
     end
 
     subgraph Tier4 ["⬜ Tier 4 — Server + CLI"]

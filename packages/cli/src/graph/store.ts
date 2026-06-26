@@ -156,10 +156,9 @@ export function saveGraph(graph: KnowledgeGraph): void {
       metadata         = excluded.metadata
   `);
 
-  const upsertFts = db.prepare(`
-    INSERT INTO nodes_fts (node_id, label) VALUES (?, ?)
-    ON CONFLICT DO NOTHING
-  `);
+  // FTS5 virtual tables don't support ON CONFLICT — delete first, then insert.
+  const deleteFts = db.prepare(`DELETE FROM nodes_fts WHERE node_id = ?`);
+  const insertFts = db.prepare(`INSERT INTO nodes_fts (node_id, label) VALUES (?, ?)`);
 
   const upsertEdge = db.prepare(`
     INSERT INTO edges (id, source, target, weight, type, first_seen, last_seen)
@@ -191,7 +190,8 @@ export function saveGraph(graph: KnowledgeGraph): void {
         JSON.stringify(node.conversationRefs),
         JSON.stringify(node.metadata),
       );
-      upsertFts.run(node.id, node.label);
+      deleteFts.run(node.id);
+      insertFts.run(node.id, node.label);
     }
 
     for (const edge of Object.values(graph.edges)) {

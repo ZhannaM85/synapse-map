@@ -34,7 +34,7 @@ _Core domain logic: merge algorithm, slug generation, and the scan orchestration
 | # | Issue | Notes |
 |---|-------|-------|
 | ~~[#9](https://github.com/ZhannaM85/synapse-map/issues/9)~~ | ~~feat: implement slug generation, alias table, and graph merge algorithm~~ | ~~Depends on #2, #8~~ |
-| [#10](https://github.com/ZhannaM85/synapse-map/issues/10) | feat: implement synapse scan command | Depends on #3, #4, #8, #9 — completes the full scan pipeline |
+| ~~[#10](https://github.com/ZhannaM85/synapse-map/issues/10)~~ | ~~feat: implement synapse scan command~~ | ~~Depends on #3, #4, #8, #9 — completes the full scan pipeline~~ |
 
 ---
 
