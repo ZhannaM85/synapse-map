@@ -4,6 +4,11 @@ import path from 'path';
 
 export default defineConfig({
     plugins: [react()],
+    server: {
+        proxy: {
+            '/api': 'http://localhost:4242',
+        },
+    },
     build: {
         outDir: path.resolve(__dirname, '../cli/public'),
         emptyOutDir: true,
