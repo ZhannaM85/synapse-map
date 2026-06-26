@@ -5,3 +5,4 @@ packages/cli/public/
 *.d.ts.map
 .env
 .env.local
+.mouse-fixes/
