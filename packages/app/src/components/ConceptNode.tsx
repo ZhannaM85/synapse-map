@@ -43,7 +43,6 @@ function toTitleCase(str: string): string {
 function ConceptNode({ data }: NodeProps<ConceptNodeType>) {
     const clamped = Math.min(Math.max(data.weight, 1), 20);
     const t = (clamped - 1) / 19;
-    const width = 40 + t * 80;
     const fontSize = 9 + t * 4;
     const color = TYPE_COLORS[data.type] ?? '#64748b';
 
@@ -63,7 +62,6 @@ function ConceptNode({ data }: NodeProps<ConceptNodeType>) {
                         'animate-node-appear cursor-pointer transition-all duration-200',
                     )}
                     style={{
-                        width,
                         borderColor: data.highlighted ? color : `${color}60`,
                         borderWidth: data.highlighted ? 2 : 1,
                         boxShadow: data.highlighted
@@ -74,7 +72,7 @@ function ConceptNode({ data }: NodeProps<ConceptNodeType>) {
                     <CardContent className="space-y-1 p-1.5">
                         <div className="flex items-center justify-between gap-1">
                             <span
-                                className="min-w-0 flex-1 truncate font-medium leading-tight text-card-foreground"
+                                className="whitespace-nowrap font-medium leading-tight text-card-foreground"
                                 style={{ fontSize }}
                             >
                                 {toTitleCase(data.label)}
@@ -88,7 +86,7 @@ function ConceptNode({ data }: NodeProps<ConceptNodeType>) {
                                 className="h-1.5 w-1.5 shrink-0 rounded-full"
                                 style={{ backgroundColor: color }}
                             />
-                            <span className="truncate text-[9px] text-muted-foreground">
+                            <span className="whitespace-nowrap text-[9px] text-muted-foreground">
                                 {data.type}
                             </span>
                         </div>
