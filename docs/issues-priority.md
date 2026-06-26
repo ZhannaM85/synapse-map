@@ -57,7 +57,7 @@ _Full graph visualization UI. #15 first (scaffold); then #16, #17; then the rest
 |---|-------|-------|
 | [#15](https://github.com/ZhannaM85/synapse-map/issues/15) | feat: scaffold React + Vite + Tailwind + shadcn/ui frontend app | Do first in this tier — required by all other frontend issues |
 | [#16](https://github.com/ZhannaM85/synapse-map/issues/16) | feat: implement Zustand graph store | Depends on #15 — required by GraphCanvas, NodeDetail, SearchBar |
-| [#17](https://github.com/ZhannaM85/synapse-map/issues/17) | feat: implement React Flow canvas with d3-force layout | Depends on #15, #16 — the main visualization |
+| ~~[#17](https://github.com/ZhannaM85/synapse-map/issues/17)~~ | ~~feat: implement React Flow canvas with d3-force layout~~ | ~~Depends on #15, #16 — the main visualization~~ |
 | [#18](https://github.com/ZhannaM85/synapse-map/issues/18) | feat: implement custom ConceptNode component (shadcn Card + weight badge) | Depends on #15, #17 |
 | [#19](https://github.com/ZhannaM85/synapse-map/issues/19) | feat: implement NodeDetail sidebar | Depends on #15, #16 |
 | [#20](https://github.com/ZhannaM85/synapse-map/issues/20) | feat: implement SearchBar with shadcn Command palette | Depends on #15, #16 |
