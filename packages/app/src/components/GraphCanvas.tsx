@@ -6,6 +6,7 @@ import {
     Controls,
     MiniMap,
     useReactFlow,
+    useViewport,
     type Node,
     type Edge,
     type NodeMouseHandler,
@@ -24,7 +25,12 @@ import {
 import { useGraphStore, type GraphNode, type GraphEdge } from '../store/graphStore.js';
 import ConceptNode, { type ConceptNodeData } from './ConceptNode.js';
 
-const INITIAL_NODE_LIMIT = 50;
+const LOD_LEVELS = [
+    { maxZoom: 0.4, nodeWeight: 80, edgeWeight: 20 }, // LOD 0 — Hubs (~18 nodes, ~39 edges)
+    { maxZoom: 0.7, nodeWeight: 40, edgeWeight: 10 }, // LOD 1 — Overview (~65 nodes, ~215 edges)
+    { maxZoom: 1.2, nodeWeight: 15, edgeWeight: 5  }, // LOD 2 — Detail (~135 nodes, ~863 edges)
+    { maxZoom: Infinity, nodeWeight: 5, edgeWeight: 2 }, // LOD 3 — Deep (~641 nodes)
+] as const;
 
 const nodeTypes = { concept: ConceptNode };
 
@@ -69,6 +75,10 @@ function GraphCanvasInner() {
     const { nodes: storeNodes, edges: storeEdges, loadGraph, selectNode, selectedNodeId } =
         useGraphStore();
     const { fitView } = useReactFlow();
+    const { zoom } = useViewport();
+
+    const lod = (zoom < 0.4 ? 0 : zoom < 0.7 ? 1 : zoom < 1.2 ? 2 : 3) as 0 | 1 | 2 | 3;
+    const { nodeWeight: nodeWeightThreshold, edgeWeight: edgeWeightThreshold } = LOD_LEVELS[lod];
 
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -78,13 +88,13 @@ function GraphCanvasInner() {
         loadGraph();
     }, [loadGraph]);
 
-    const topNodeIds = useMemo(() => {
-        const sorted = [...storeNodes].sort((a, b) => b.weight - a.weight);
-        return new Set(sorted.slice(0, INITIAL_NODE_LIMIT).map((n) => n.id));
-    }, [storeNodes]);
+    const baseNodeIds = useMemo(
+        () => new Set(storeNodes.filter((n) => n.weight >= nodeWeightThreshold).map((n) => n.id)),
+        [storeNodes, nodeWeightThreshold],
+    );
 
     const visibleNodeIds = useMemo(() => {
-        const ids = new Set(topNodeIds);
+        const ids = new Set(baseNodeIds);
         for (const id of expandedIds) {
             for (const edge of storeEdges) {
                 if (edge.source === id) ids.add(edge.target);
@@ -92,7 +102,7 @@ function GraphCanvasInner() {
             }
         }
         return ids;
-    }, [topNodeIds, expandedIds, storeEdges]);
+    }, [baseNodeIds, expandedIds, storeEdges]);
 
     const visibleNodes = useMemo(
         () => storeNodes.filter((n) => visibleNodeIds.has(n.id)),
@@ -102,9 +112,12 @@ function GraphCanvasInner() {
     const visibleEdges = useMemo(
         () =>
             storeEdges.filter(
-                (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target),
+                (e) =>
+                    e.weight >= edgeWeightThreshold &&
+                    visibleNodeIds.has(e.source) &&
+                    visibleNodeIds.has(e.target),
             ),
-        [storeEdges, visibleNodeIds],
+        [storeEdges, visibleNodeIds, edgeWeightThreshold],
     );
 
     const connectedToHovered = useMemo(() => {
@@ -155,10 +168,11 @@ function GraphCanvasInner() {
                         weight: n.weight,
                         highlighted,
                         expanded: expandedIds.has(n.id),
+                        lod,
                     },
                 };
             }),
-        [visibleNodes, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds],
+        [visibleNodes, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod],
     );
 
     const maxWeight = useMemo(

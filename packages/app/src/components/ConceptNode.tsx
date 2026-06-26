@@ -10,6 +10,7 @@ export type ConceptNodeData = {
     weight: number;
     highlighted: boolean;
     expanded: boolean;
+    lod?: 0 | 1 | 2 | 3;
 };
 
 type ConceptNodeType = Node<ConceptNodeData, 'concept'>;
