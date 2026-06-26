@@ -16,6 +16,14 @@ const NLP_STOPWORDS = new Set([
   'right','wrong','true','false','yes','no','ok','okay',
   'session','sessions','conversation','conversations','response','responses',
   'output','input','command','commands','task','tasks','note','notes',
+  // Pronouns that compromise.js sometimes tags as proper nouns
+  'you','them','they','their','we','our','he','she','his','her','it','its',
+  'me','him','us','my','your','i','am',
+  // Generic structural terms
+  'source','code','line','lines','section','sections','page','pages',
+  'repo','repository','folder','directory','path','url','link','links',
+  'file','files','this file','summary','summaries','context','detail','details',
+  'user','users','account','accounts','name','names',
 ]);
 
 function toTitleCase(str: string): string {
@@ -29,6 +37,8 @@ function isUsefulPhrase(phrase: string): boolean {
   if (/^\d+$/.test(lower)) return false;
   // Skip article-leading phrases ("A Session", "The Thing")
   if (/^(a|an|the)\s/i.test(lower)) return false;
+  // Skip phrases with trailing punctuation artifacts ("User-", "React.")
+  if (/[-_.]$/.test(lower)) return false;
   // Skip phrases longer than 4 words
   if (lower.split(/\s+/).length > 4) return false;
   return true;

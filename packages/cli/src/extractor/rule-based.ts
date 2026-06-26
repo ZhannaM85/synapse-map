@@ -39,6 +39,18 @@ function normalizeToken(raw: string): string | null {
   return raw;
 }
 
+// Generic top-level directory names that aren't meaningful project names
+const GENERIC_DIRS = new Set([
+  'projects', 'repos', 'repository', 'repositories', 'workspace', 'workspaces',
+  'src', 'source', 'code', 'dev', 'development', 'work', 'home', 'users', 'user',
+  'documents', 'desktop', 'downloads', 'temp', 'tmp', 'github', 'gitlab',
+]);
+
+// Strips URLs so "https://..." doesn't trigger HTTPS/HTTP vocabulary matches
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, ' ');
+}
+
 function matchVocabulary(text: string): string[] {
   const found: string[] = [];
   for (const { term, re } of VOCAB_PATTERNS) {
@@ -59,7 +71,8 @@ export class RuleBasedExtractor implements Extractor {
   }
 
   extract(session: ParsedSession): ExtractionResult {
-    const text = session.userMessages.join('\n');
+    const rawText = session.userMessages.join('\n');
+    const text = stripUrls(rawText);
     const labels = new Set<string>();
 
     // Layer 1 — vocabulary matching: fastest, highest-confidence, curated terms
@@ -83,9 +96,12 @@ export class RuleBasedExtractor implements Extractor {
       if (norm) labels.add(norm);
     }
 
-    // Project: last segment of the working directory path
+    // Project: last path segment, skipping generic directory names
     const cwdParts = session.cwd.split(/[\\/]/).filter(Boolean);
-    const projects = cwdParts.length > 0 ? [cwdParts[cwdParts.length - 1]!] : [];
+    const projectName = cwdParts.findLast(
+      p => !GENERIC_DIRS.has(p.toLowerCase()) && !/^[a-z]:$/i.test(p),
+    );
+    const projects = projectName ? [projectName] : [];
 
     return { topics: Array.from(labels), projects };
   }

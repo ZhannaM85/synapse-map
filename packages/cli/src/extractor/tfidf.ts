@@ -35,6 +35,8 @@ const STOPWORDS = new Set([
   // Claude Code conversation meta-terms (not technical topics)
   'session','sessions','conversation','conversations','response','responses',
   'output','input','task','tasks','note','notes','prompt','prompts',
+  'user','users','summary','summaries','context','message','messages',
+  'line','lines','page','pages','section','sections','repo','repository',
   // Contraction artifacts (apostrophes stripped by tokenizer: "doesn't" → "doesn")
   'doesn','isn','aren','wasn','weren','can','won','wouldn','couldn',
   'shouldn','haven','hasn','don','let','didn','mustn','needn',

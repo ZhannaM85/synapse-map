@@ -175,6 +175,18 @@ Added to `types.ts` so the interface lives with its input/output types. Future L
 
 ---
 
+### `packages/cli/src/graph/builder.ts`
+**Why it exists:** The bridge between extraction and storage. Takes raw labels from the extractor and merges them into the live `KnowledgeGraph` in memory — creating or incrementing nodes, generating co-occurrence edges, and recording the processed session. Everything `store.ts` saves, `builder.ts` produced.
+
+| Export | Purpose |
+|--------|---------|
+| `toSlug(label)` | Converts a canonical label to a stable URL-safe node ID. Deterministic: same label always → same slug. Handles C++ → `cpp`, C# → `csharp`, Next.js → `next-js`, spaces → hyphens. |
+| `mergeSession(graph, session, result, fileHash)` | Upserts all topics and projects from one `ExtractionResult` into the graph. Increments `weight` and appends `sessionId` to `conversationRefs` for existing nodes (idempotent — duplicate session IDs are skipped). Creates `related` edges for every pair of nodes in the session, capped at 20 nodes to prevent O(n²) explosion on noisy sessions. Records the session in `processedSessions` with its file hash. |
+
+**Edge ID format:** `[slugA]→[slugB]` with slugs sorted alphabetically — guarantees no duplicate edges regardless of extraction order.
+
+---
+
 ### `packages/cli/src/graph/store.ts`
 **Why it exists:** All graph data is persisted in a local SQLite database at `~/.synapse/graph.db`. This module is the only place that reads from or writes to that database.
 
@@ -240,10 +252,10 @@ flowchart LR
         T6["#6 TF-IDF"]
         T7["#7 NLP"]
         T8["#8 RuleBasedExtractor"]
+        T9["#9 Merge Algorithm"]
     end
 
-    subgraph Tier3 ["🔨 Tier 3 — Graph Builder + Scan"]
-        T9["#9 Merge Algorithm"]
+    subgraph Tier3 ["🔨 Tier 3 — Scan Command"]
         T10["#10 Scan Command"]
     end
 
