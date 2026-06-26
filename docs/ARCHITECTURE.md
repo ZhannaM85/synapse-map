@@ -360,9 +360,51 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 
 ---
 
-## Frontend Layer (`packages/app/src/components/`)
+## Frontend Layer (`packages/app/src/`)
 
 Added in issues #15–#17. The browser UI for exploring the knowledge graph, built with React Flow for canvas rendering and d3-force for automatic graph layout.
+
+### `packages/app/src/api/client.ts`
+**Why it exists:** Single place that knows the server's URL shape. All `fetch` calls go through here so the rest of the UI never hard-codes endpoint strings — if a route changes, only this file needs updating.
+
+| Export | Purpose |
+|--------|---------|
+| `ApiNode` | Type for a node as returned by the server (`id`, `label`, `type`, `weight`, `firstSeen`, `lastSeen`). |
+| `ApiEdge` | Type for an edge as returned by the server (`id`, `source`, `target`, `weight`, `type`). |
+| `ApiGraph` | Full graph payload: `nodes` and `edges` as `Record<id, item>`, plus `updatedAt`. |
+| `ApiStatus` | Stats payload: `nodeCount`, `edgeCount`, `lastUpdated`. |
+| `api` | Object with typed wrappers for every endpoint: `graph()`, `nodes()`, `node(id)`, `edges()`, `search(q)`, `status()`, `scan()`, `scanProgress()`. `scanProgress()` returns an `EventSource` for the SSE stream. |
+
+---
+
+### `packages/app/src/lib/utils.ts`
+**Why it exists:** shadcn/ui components rely on `cn()` to merge Tailwind class strings safely — `clsx` handles conditionals and arrays, `tailwind-merge` resolves conflicts between utility classes (e.g. `p-2` vs `p-4`).
+
+| Export | Purpose |
+|--------|---------|
+| `cn(...inputs)` | Combines `clsx` + `tailwind-merge`. Accepts any mix of strings, arrays, and objects; returns a single deduplicated class string. |
+
+---
+
+### `packages/app/src/store/graphStore.ts`
+**Why it exists:** Central client-side state for the entire UI. Co-locating the data-fetching logic with the state it produces means every component reads from the same source and re-renders together — no prop drilling, no duplicate fetch calls.
+
+| Export | Purpose |
+|--------|---------|
+| `GraphNode` (re-export of `ApiNode`) | Node type used throughout the UI layer. |
+| `GraphEdge` (re-export of `ApiEdge`) | Edge type used throughout the UI layer. |
+| `useGraphStore` | Zustand store hook. Exposes `nodes`, `edges`, `selectedNodeId`, `searchQuery`, `isScanning`, `scanProgress`, and four actions. |
+
+**Actions:**
+
+| Action | Behaviour |
+|--------|-----------|
+| `loadGraph()` | Fetches `GET /api/graph`, converts the `Record<id, item>` maps to flat arrays, and writes to `nodes`/`edges`. |
+| `selectNode(id)` | Sets `selectedNodeId`; pass `null` to deselect. |
+| `setSearchQuery(q)` | Updates `searchQuery` string (consumed by `SearchBar`). |
+| `triggerScan()` | POSTs to `/api/scan`, opens an SSE connection to `/api/scan/progress`, updates `scanProgress` (0–100) on each `progress` event, and calls `loadGraph()` on `complete`. Guards against concurrent scans with `isScanning`. |
+
+---
 
 ### `packages/app/src/components/ConceptNode.tsx`
 **Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via size, selection/hover via glow — so users can scan the canvas and immediately spot important or related concepts without reading labels.
