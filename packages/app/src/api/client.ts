@@ -13,6 +13,14 @@ export interface ApiNode {
     weight: number;
     firstSeen: string;
     lastSeen: string;
+    conversationRefs?: string[];
+}
+
+export interface ApiProcessedSession {
+    sessionId: string;
+    cwd: string;
+    processedAt: string;
+    fileHash: string;
 }
 
 export interface ApiEdge {
@@ -26,6 +34,7 @@ export interface ApiEdge {
 export interface ApiGraph {
     nodes: Record<string, ApiNode>;
     edges: Record<string, ApiEdge>;
+    processedSessions?: Record<string, ApiProcessedSession>;
     updatedAt: string;
 }
 
