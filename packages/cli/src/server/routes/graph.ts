@@ -4,8 +4,17 @@ import type { GraphEdge, GraphNode } from '../../graph/types.js';
 
 const router = Router();
 
-router.get('/', (_req, res) => {
+router.get('/', (req, res) => {
   const graph = loadGraph();
+  const minEdgeWeight = parseInt(req.query['minEdgeWeight'] as string, 10);
+  if (!isNaN(minEdgeWeight) && minEdgeWeight > 1) {
+    const filtered: typeof graph.edges = {};
+    for (const [id, edge] of Object.entries(graph.edges)) {
+      if (edge.weight >= minEdgeWeight) filtered[id] = edge;
+    }
+    res.json({ ...graph, edges: filtered });
+    return;
+  }
   res.json(graph);
 });
 

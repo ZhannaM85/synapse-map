@@ -115,10 +115,16 @@ function GraphCanvasInner() {
     const visibleNodeIds = useMemo(() => {
         const ids = new Set(baseNodeIds);
         for (const id of expandedIds) {
-            for (const edge of storeEdges) {
-                if (edge.source === id) ids.add(edge.target);
-                if (edge.target === id) ids.add(edge.source);
-            }
+            // Show the top 15 neighbors that aren't already visible at the current LOD
+            storeEdges
+                .filter((e) => {
+                    if (e.source !== id && e.target !== id) return false;
+                    const nbr = e.source === id ? e.target : e.source;
+                    return !baseNodeIds.has(nbr);
+                })
+                .sort((a, b) => b.weight - a.weight)
+                .slice(0, 15)
+                .forEach((e) => ids.add(e.source === id ? e.target : e.source));
         }
         return ids;
     }, [baseNodeIds, expandedIds, storeEdges]);
@@ -174,6 +180,11 @@ function GraphCanvasInner() {
         setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
     }, [layoutPositions]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    const nodeById = useMemo(
+        () => new Map(storeNodes.map((n) => [n.id, n])),
+        [storeNodes],
+    );
+
     const flowNodes: Node<ConceptNodeData>[] = useMemo(
         () =>
             visibleNodes.map((n) => {
@@ -182,6 +193,23 @@ function GraphCanvasInner() {
                     hoveredNodeId !== null
                         ? connectedToHovered.has(n.id)
                         : n.id === selectedNodeId;
+
+                const connections = storeEdges
+                    .filter((e) => e.source === n.id || e.target === n.id)
+                    .sort((a, b) => b.weight - a.weight)
+                    .slice(0, 10)
+                    .map((e) => {
+                        const nbrId = e.source === n.id ? e.target : e.source;
+                        const nbr = nodeById.get(nbrId);
+                        return {
+                            id: nbrId,
+                            label: nbr?.label ?? nbrId,
+                            edgeWeight: e.weight,
+                            nodeWeight: nbr?.weight ?? 0,
+                            inView: visibleNodeIds.has(nbrId),
+                        };
+                    });
+
                 return {
                     id: n.id,
                     type: 'concept' as const,
@@ -193,10 +221,11 @@ function GraphCanvasInner() {
                         highlighted,
                         expanded: expandedIds.has(n.id),
                         lod,
+                        connections,
                     },
                 };
             }),
-        [visibleNodes, layoutPositions, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod],
+        [visibleNodes, layoutPositions, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod, storeEdges, nodeById, visibleNodeIds],
     );
 
     const maxWeight = useMemo(
@@ -252,6 +281,7 @@ function GraphCanvasInner() {
 
     const onPaneClick = useCallback(() => {
         selectNode(null);
+        setExpandedIds(new Set());
     }, [selectNode]);
 
     return (

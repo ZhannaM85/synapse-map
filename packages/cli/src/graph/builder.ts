@@ -47,8 +47,7 @@ export function mergeSession(
   }
 
   // ── Upsert co-occurrence edges ──────────────────────────────────────────────
-  // Cap at 20 nodes to prevent O(n²) edge explosion on noisy sessions.
-  const edgeNodes = nodeIds.slice(0, 20);
+  const edgeNodes = nodeIds;
   for (let i = 0; i < edgeNodes.length; i++) {
     for (let j = i + 1; j < edgeNodes.length; j++) {
       const [a, b] = [edgeNodes[i]!, edgeNodes[j]!].sort();

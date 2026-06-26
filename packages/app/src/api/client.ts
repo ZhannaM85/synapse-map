@@ -45,7 +45,7 @@ export interface ApiStatus {
 }
 
 export const api = {
-    graph: () => json<ApiGraph>('/graph'),
+    graph: () => json<ApiGraph>('/graph?minEdgeWeight=2'),
     nodes: (type?: string) => json<ApiNode[]>(`/graph/nodes${type ? `?type=${type}` : ''}`),
     node: (id: string) => json<ApiNode>(`/graph/nodes/${id}`),
     edges: (minWeight?: number) => json<ApiEdge[]>(`/graph/edges${minWeight != null ? `?minWeight=${minWeight}` : ''}`),
