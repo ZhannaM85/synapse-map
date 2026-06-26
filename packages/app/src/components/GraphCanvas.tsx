@@ -83,7 +83,7 @@ function GraphCanvasInner() {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const [layoutPositions, setLayoutPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
-    const prevLodRef = useRef<number | null>(null);
+    const hasInitialFit = useRef(false);
 
     useEffect(() => {
         loadGraph();
@@ -149,13 +149,12 @@ function GraphCanvasInner() {
         setLayoutPositions(new Map(positions));
     }, [visibleNodes, visibleEdges]);
 
-    // fitView once per LOD level, after layout positions are ready
+    // fitView exactly once — when the first layout positions arrive
     useEffect(() => {
-        if (layoutPositions.size === 0) return;
-        if (prevLodRef.current === lod) return;
-        prevLodRef.current = lod;
-        setTimeout(() => fitView({ padding: 0.2, duration: 600 }), 50);
-    }, [layoutPositions, lod, fitView]);
+        if (layoutPositions.size === 0 || hasInitialFit.current) return;
+        hasInitialFit.current = true;
+        setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+    }, [layoutPositions]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const flowNodes: Node<ConceptNodeData>[] = useMemo(
         () =>
