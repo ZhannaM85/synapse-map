@@ -369,9 +369,10 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 | Export | Purpose |
 |--------|---------|
-| `ApiNode` | Type for a node as returned by the server (`id`, `label`, `type`, `weight`, `firstSeen`, `lastSeen`). |
+| `ApiNode` | Type for a node as returned by the server (`id`, `label`, `type`, `weight`, `firstSeen`, `lastSeen`, `conversationRefs?`). Added optional `conversationRefs` array in #19 so `NodeDetail` can list which sessions mentioned the node. |
+| `ApiProcessedSession` | Type for a processed session record (`sessionId`, `cwd`, `processedAt`, `fileHash`). Added in #19 so the sidebar can display session working directories and dates. |
 | `ApiEdge` | Type for an edge as returned by the server (`id`, `source`, `target`, `weight`, `type`). |
-| `ApiGraph` | Full graph payload: `nodes` and `edges` as `Record<id, item>`, plus `updatedAt`. |
+| `ApiGraph` | Full graph payload: `nodes` and `edges` as `Record<id, item>`, optional `processedSessions` map, plus `updatedAt`. Extended in #19 with `processedSessions` so the store can resolve session IDs to metadata. |
 | `ApiStatus` | Stats payload: `nodeCount`, `edgeCount`, `lastUpdated`. |
 | `api` | Object with typed wrappers for every endpoint: `graph()`, `nodes()`, `node(id)`, `edges()`, `search(q)`, `status()`, `scan()`, `scanProgress()`. `scanProgress()` returns an `EventSource` for the SSE stream. |
 
@@ -393,13 +394,19 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 |--------|---------|
 | `GraphNode` (re-export of `ApiNode`) | Node type used throughout the UI layer. |
 | `GraphEdge` (re-export of `ApiEdge`) | Edge type used throughout the UI layer. |
-| `useGraphStore` | Zustand store hook. Exposes `nodes`, `edges`, `selectedNodeId`, `searchQuery`, `isScanning`, `scanProgress`, and four actions. |
+| `useGraphStore` | Zustand store hook. Exposes `nodes`, `edges`, `processedSessions`, `selectedNodeId`, `searchQuery`, `isScanning`, `scanProgress`, and four actions. |
+
+**State (added in #19):**
+
+| Field | Purpose |
+|-------|---------|
+| `processedSessions` | `Record<string, ApiProcessedSession>` — session metadata (cwd, date) keyed by session ID. Populated by `loadGraph()` from the API's `processedSessions` map so `NodeDetail` can resolve `conversationRefs` to human-readable info without extra API calls. |
 
 **Actions:**
 
 | Action | Behaviour |
 |--------|-----------|
-| `loadGraph()` | Fetches `GET /api/graph`, converts the `Record<id, item>` maps to flat arrays, and writes to `nodes`/`edges`. |
+| `loadGraph()` | Fetches `GET /api/graph`, converts the `Record<id, item>` maps to flat arrays, stores `processedSessions` map, and writes to `nodes`/`edges`. |
 | `selectNode(id)` | Sets `selectedNodeId`; pass `null` to deselect. |
 | `setSearchQuery(q)` | Updates `searchQuery` string (consumed by `SearchBar`). |
 | `triggerScan()` | POSTs to `/api/scan`, opens an SSE connection to `/api/scan/progress`, updates `scanProgress` (0–100) on each `progress` event, and calls `loadGraph()` on `complete`. Guards against concurrent scans with `isScanning`. |
@@ -464,6 +471,27 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 ---
 
+### `packages/app/src/components/NodeDetail.tsx`
+**Why it exists:** The detail sidebar for a selected graph node. Separating node inspection into a dedicated panel — rather than a modal or tooltip — lets users compare the sidebar content with the canvas simultaneously, and clicking related nodes in the sidebar navigates without losing context.
+
+| Export | Purpose |
+|--------|---------|
+| `default` (`NodeDetail` component) | Renders a collapsible `<aside>` that slides in from the right when `selectedNodeId` is set. Width animates between `w-0` (collapsed) and `w-80` (expanded) via CSS `transition-all`. |
+
+**Sections displayed (when a node is selected):**
+
+| Section | Detail |
+|---------|--------|
+| **Header** | Node label (truncated), type dot with colour from `TYPE_COLORS`, and a close button that calls `selectNode(null)`. |
+| **Weight** | Large `Badge` showing the numeric weight with a "conversations" label. |
+| **Timeline** | First seen / last seen dates formatted via `formatDate()` (`toLocaleDateString` with short month). |
+| **Related nodes** | Edges connected to the selected node, sorted by edge weight descending. Each row shows the neighbour's label (with type-colour dot) and edge weight in an outline `Badge`. Clicking a neighbour calls `selectNode(neighbourId)` to navigate the sidebar in-place. |
+| **Conversations** | `conversationRefs` resolved to session metadata via `processedSessions` from the store. Shows session ID (monospace), working directory, and processed date. Sorted by date descending. |
+
+**Internal helpers:** `TYPE_COLORS` is the same colour palette as `ConceptNode` (indigo for concept, emerald for project, etc.). `formatDate(iso)` formats ISO strings to locale-aware "MMM D, YYYY" display.
+
+---
+
 ### `packages/app/src/index.css`
 **Why it exists:** Defines the dark-mode design tokens (CSS custom properties) that shadcn/ui components consume. Centralising colour definitions here — rather than in Tailwind config or inline styles — means swapping themes or adding a light mode requires editing one file.
 
@@ -490,11 +518,23 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 ---
 
+### `packages/app/vite.config.ts`
+**Why it exists:** Configures Vite for the frontend dev server and production build. The `server.proxy` rule (added in #19) forwards `/api/*` requests to the Express backend at `localhost:4242` during development, so `npm run dev` works without CORS issues or hard-coded origins. The production build outputs to `packages/cli/public/` so the CLI can serve the frontend as static files.
+
+| Config | Purpose |
+|--------|---------|
+| `plugins` | `@vitejs/plugin-react` for JSX transform and Fast Refresh. |
+| `server.proxy` | Proxies `/api` requests to `http://localhost:4242` — the Express API. Enables `npm run dev` to run Vite's HMR server on port 5173 while API calls transparently reach the backend. |
+| `build.outDir` | Outputs compiled assets to `packages/cli/public/` so `synapse serve` can host them as static files. `emptyOutDir: true` cleans stale files on rebuild. |
+| `resolve.alias` | Maps `@` to `./src` for cleaner import paths. |
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#18)"]
+    subgraph Done ["✅ Done (#1–#19)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -511,10 +551,11 @@ flowchart LR
         T16["#16 Zustand Store"]
         T17["#17 React Flow Canvas"]
         T18["#18 Custom ConceptNode"]
+        T19["#19 NodeDetail Sidebar"]
     end
 
     subgraph Tier5 ["⬜ Tier 5 — React UI (remaining)"]
-        T19["#19–21 Frontend"]
+        T20["#20–21 Frontend"]
     end
 
     Done --> Tier5

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { api, ApiNode as GraphNode, ApiEdge as GraphEdge } from '../api/client.js';
+import { api, ApiNode as GraphNode, ApiEdge as GraphEdge, type ApiProcessedSession } from '../api/client.js';
 
 export type { GraphNode, GraphEdge };
 
 interface GraphStore {
     nodes: GraphNode[];
     edges: GraphEdge[];
+    processedSessions: Record<string, ApiProcessedSession>;
     selectedNodeId: string | null;
     searchQuery: string;
     isScanning: boolean;
@@ -20,6 +21,7 @@ interface GraphStore {
 export const useGraphStore = create<GraphStore>((set, get) => ({
     nodes: [],
     edges: [],
+    processedSessions: {},
     selectedNodeId: null,
     searchQuery: '',
     isScanning: false,
@@ -30,6 +32,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         set({
             nodes: Object.values(graph.nodes),
             edges: Object.values(graph.edges),
+            processedSessions: graph.processedSessions ?? {},
         });
     },
 
