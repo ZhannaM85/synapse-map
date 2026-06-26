@@ -45,7 +45,7 @@ _The Express API and CLI wiring. #11, #13 can be done in parallel; #12 and #14 f
 |---|-------|-------|
 | ~~[#11](https://github.com/ZhannaM85/synapse-map/issues/11)~~ | ~~feat: implement Express REST API (graph, nodes, edges, search, status routes)~~ | ~~Depends on #4 — required by serve and frontend~~ |
 | ~~[#13](https://github.com/ZhannaM85/synapse-map/issues/13)~~ | ~~feat: implement synapse status and synapse reset commands~~ | ~~Depends on #4 — independent of #11~~ |
-| [#12](https://github.com/ZhannaM85/synapse-map/issues/12) | feat: implement synapse serve command (Express + static file serving) | Depends on #11 |
+| ~~[#12](https://github.com/ZhannaM85/synapse-map/issues/12)~~ | ~~feat: implement synapse serve command (Express + static file serving)~~ | ~~Depends on #11~~ |
 | [#14](https://github.com/ZhannaM85/synapse-map/issues/14) | feat: implement commander CLI entry point with all subcommands | Depends on #10, #12, #13 — ties the whole CLI together |
 
 ---
