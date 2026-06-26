@@ -4,7 +4,7 @@
   "description": "Transform your Claude Code conversations into a living knowledge graph",
   "type": "module",
   "bin": {
-    "synapse-map": "./dist/index.js"
+    "synapse": "./dist/index.js"
   },
   "files": [
     "dist/",
