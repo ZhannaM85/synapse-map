@@ -12,13 +12,13 @@ interface GraphStore {
     isScanning: boolean;
     scanProgress: number;
     expandedNodeId: string | null;
-    hubNodeIds: Set<string>;
+    previousLevelIds: Set<string>;
 
     loadGraph: () => Promise<void>;
     selectNode: (id: string | null) => void;
     setSearchQuery: (q: string) => void;
     triggerScan: () => void;
-    setViewState: (expandedNodeId: string | null, hubNodeIds: Set<string>) => void;
+    setViewState: (expandedNodeId: string | null, previousLevelIds: Set<string>) => void;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -30,7 +30,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     isScanning: false,
     scanProgress: 0,
     expandedNodeId: null,
-    hubNodeIds: new Set<string>(),
+    previousLevelIds: new Set<string>(),
 
     loadGraph: async () => {
         const graph = await api.graph();
@@ -42,7 +42,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     },
 
     selectNode: (id) => set({ selectedNodeId: id }),
-    setViewState: (expandedNodeId, hubNodeIds) => set({ expandedNodeId, hubNodeIds }),
+    setViewState: (expandedNodeId, previousLevelIds) => set({ expandedNodeId, previousLevelIds }),
 
     setSearchQuery: (q) => set({ searchQuery: q }),
 

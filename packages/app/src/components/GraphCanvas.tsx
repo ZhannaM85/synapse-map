@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -99,7 +99,7 @@ function GraphCanvasInner() {
     const lod = (zoom < 0.4 ? 0 : zoom < 0.7 ? 1 : zoom < 1.2 ? 2 : 3) as 0 | 1 | 2 | 3;
     const { nodeWeight: nodeWeightThreshold, edgeWeight: edgeWeightThreshold } = LOD_LEVELS[lod];
 
-    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const [navStack, setNavStack] = useState<string[]>([]);
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const [layoutPositions, setLayoutPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
     const hasInitialFit = useRef(false);
@@ -113,33 +113,46 @@ function GraphCanvasInner() {
         [storeNodes, nodeWeightThreshold],
     );
 
-    useEffect(() => {
-        const expandedNodeId = expandedIds.size > 0 ? [...expandedIds][0]! : null;
-        setViewState(expandedNodeId, baseNodeIds);
-    }, [expandedIds, baseNodeIds, setViewState]);
-
     const TARGET_EXPANDED_TOTAL = 20;
 
-    const visibleNodeIds = useMemo(() => {
-        if (expandedIds.size === 0) return new Set(baseNodeIds);
-
-        // Expanded view: show only neighbors that are NOT already hub nodes.
-        // This reveals the next layer down — concepts unique to this node's
-        // neighborhood that aren't visible at the top level.
-        const ids = new Set<string>();
-        for (const id of expandedIds) {
+    // Build the set of nodes seen at ALL levels above the current one.
+    // Each level excludes everything already visible in prior levels.
+    const excludedByPriorLevels = useMemo(() => {
+        const excluded = new Set(baseNodeIds);
+        for (let i = 0; i < navStack.length - 1; i++) {
+            const id = navStack[i]!;
             storeEdges
                 .filter((e) => {
                     if (e.source !== id && e.target !== id) return false;
-                    const nbr = e.source === id ? e.target : e.source;
-                    return !baseNodeIds.has(nbr); // skip nodes already visible at hub level
+                    return !excluded.has(e.source === id ? e.target : e.source);
                 })
                 .sort((a, b) => b.weight - a.weight)
                 .slice(0, TARGET_EXPANDED_TOTAL)
-                .forEach((e) => ids.add(e.source === id ? e.target : e.source));
+                .forEach((e) => excluded.add(e.source === id ? e.target : e.source));
         }
+        return excluded;
+    }, [navStack, baseNodeIds, storeEdges]);
+
+    useEffect(() => {
+        const currentId = navStack.length > 0 ? navStack[navStack.length - 1]! : null;
+        setViewState(currentId, excludedByPriorLevels);
+    }, [navStack, excludedByPriorLevels, setViewState]);
+
+    const visibleNodeIds = useMemo(() => {
+        if (navStack.length === 0) return new Set(baseNodeIds);
+        const currentId = navStack[navStack.length - 1]!;
+        const ids = new Set<string>();
+        storeEdges
+            .filter((e) => {
+                if (e.source !== currentId && e.target !== currentId) return false;
+                const nbr = e.source === currentId ? e.target : e.source;
+                return !excludedByPriorLevels.has(nbr);
+            })
+            .sort((a, b) => b.weight - a.weight)
+            .slice(0, TARGET_EXPANDED_TOTAL)
+            .forEach((e) => ids.add(e.source === currentId ? e.target : e.source));
         return ids;
-    }, [baseNodeIds, expandedIds, storeEdges]);
+    }, [navStack, excludedByPriorLevels, storeEdges, baseNodeIds]);
 
     const visibleNodes = useMemo(
         () => storeNodes.filter((n) => visibleNodeIds.has(n.id)),
@@ -232,13 +245,13 @@ function GraphCanvasInner() {
                         type: n.type,
                         weight: n.weight,
                         highlighted,
-                        expanded: expandedIds.has(n.id),
+                        expanded: navStack[navStack.length - 1] === n.id,
                         lod,
                         connections,
                     },
                 };
             }),
-        [visibleNodes, layoutPositions, hoveredNodeId, connectedToHovered, selectedNodeId, expandedIds, lod, storeEdges, nodeById, visibleNodeIds],
+        [visibleNodes, layoutPositions, hoveredNodeId, connectedToHovered, selectedNodeId, navStack, lod, storeEdges, nodeById, visibleNodeIds],
     );
 
     const maxWeight = useMemo(
@@ -271,15 +284,7 @@ function GraphCanvasInner() {
     const onNodeClick: NodeMouseHandler = useCallback(
         (_event, node) => {
             selectNode(node.id);
-            setExpandedIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(node.id)) {
-                    next.delete(node.id);
-                } else {
-                    next.add(node.id);
-                }
-                return next;
-            });
+            setNavStack((prev) => [...prev, node.id]);
         },
         [selectNode],
     );
@@ -294,12 +299,11 @@ function GraphCanvasInner() {
 
     const onPaneClick = useCallback(() => {
         selectNode(null);
-        setExpandedIds(new Set());
     }, [selectNode]);
 
     const resetView = useCallback(() => {
         selectNode(null);
-        setExpandedIds(new Set());
+        setNavStack([]);
         hasInitialFit.current = false;
         setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
     }, [selectNode, fitView]);
@@ -322,20 +326,32 @@ function GraphCanvasInner() {
             <Background gap={20} size={1} color="#334155" />
             <Controls showInteractive={false} />
             <Panel position="top-left">
-                <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-xs text-foreground shadow">
-                    {expandedIds.size > 0 ? (
-                        <>
-                            <button onClick={resetView} className="text-muted-foreground transition-colors hover:text-foreground">
-                                Hub
-                            </button>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="font-medium">
-                                {storeNodes.find((n) => n.id === [...expandedIds][0])?.label ?? ''}
-                            </span>
-                        </>
-                    ) : (
-                        <span className="text-muted-foreground">Hub view</span>
-                    )}
+                <div className="flex items-center gap-1 rounded-md border border-border bg-muted px-3 py-1.5 text-xs text-foreground shadow">
+                    <button
+                        onClick={resetView}
+                        className={navStack.length === 0 ? 'font-medium' : 'text-muted-foreground transition-colors hover:text-foreground'}
+                    >
+                        L1 Hub
+                    </button>
+                    {navStack.map((nodeId, i) => {
+                        const label = storeNodes.find((n) => n.id === nodeId)?.label ?? nodeId;
+                        const isLast = i === navStack.length - 1;
+                        return (
+                            <Fragment key={nodeId}>
+                                <span className="text-muted-foreground">→</span>
+                                {isLast ? (
+                                    <span className="font-medium">L{i + 2} {label}</span>
+                                ) : (
+                                    <button
+                                        onClick={() => setNavStack((prev) => prev.slice(0, i + 1))}
+                                        className="text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        L{i + 2} {label}
+                                    </button>
+                                )}
+                            </Fragment>
+                        );
+                    })}
                 </div>
             </Panel>
             <MiniMap
