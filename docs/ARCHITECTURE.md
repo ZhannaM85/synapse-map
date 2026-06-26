@@ -360,11 +360,51 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 
 ---
 
+## Frontend Layer (`packages/app/src/components/`)
+
+Added in issues #15–#17. The browser UI for exploring the knowledge graph, built with React Flow for canvas rendering and d3-force for automatic graph layout.
+
+### `packages/app/src/components/ConceptNode.tsx`
+**Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via size, selection/hover via glow — so users can scan the canvas and immediately spot important or related concepts without reading labels.
+
+| Export | Purpose |
+|--------|---------|
+| `ConceptNodeData` (type) | Shape of the data payload each React Flow node carries: `label`, `type`, `weight`, `highlighted`, `expanded`. Used by `GraphCanvas` when building the `Node<ConceptNodeData>[]` array. |
+| `default` (memoised component) | Renders a circular node with: size scaled by `weight` (28–68 px), colour from `TYPE_COLORS` lookup keyed on `type`, highlight glow when hovered/selected, and a small dot indicator when the node is expanded (neighbours revealed). Hidden handles on top/bottom connect edges without visible anchors. |
+
+**Colour palette:** `concept` → indigo, `function` → violet, `class` → purple, `module` → blue, `file` → cyan, `variable` → teal, `type` → amber, `interface` → orange. Falls back to slate for unknown types.
+
+---
+
+### `packages/app/src/components/GraphCanvas.tsx`
+**Why it exists:** The central UI surface. Bridges the Zustand graph store (flat arrays of `GraphNode`/`GraphEdge`) to React Flow's rendering model, using d3-force to compute spatial positions so users see a meaningful layout rather than a pile of overlapping circles.
+
+| Export | Purpose |
+|--------|---------|
+| `default` (`GraphCanvas` component) | Top-level wrapper that provides `ReactFlowProvider` context and renders the inner canvas at full width/height. |
+| `GraphCanvasInner` (internal) | Core logic: loads graph data on mount, selects the top 50 nodes by weight, expands neighbours on click, computes force-directed layout, and maps store data to React Flow node/edge arrays. |
+| `computeLayout(graphNodes, graphEdges)` (internal) | Runs a synchronous d3-force simulation (300 ticks) with link, charge, center, and collide forces. Returns a `Map<id, {x, y}>` of settled positions. Called once per visible-set change and cached in a ref. |
+| `ForceNode` (internal interface) | Extends `SimulationNodeDatum` with `id: string` for type-safe d3-force simulation. |
+
+**Key behaviours:**
+
+| Behaviour | Detail |
+|-----------|--------|
+| **Progressive disclosure** | Only the top 50 highest-weight nodes render initially (`INITIAL_NODE_LIMIT`). Clicking a node toggles it "expanded", adding all its edge neighbours to the visible set. |
+| **Hover highlighting** | On mouse-enter, the hovered node and all directly connected nodes/edges highlight (indigo stroke, full opacity). Non-connected elements fade to 20% opacity. |
+| **Edge weight encoding** | Edge stroke width scales linearly from 1 to 6 px based on weight relative to the visible maximum. |
+| **Layout caching** | `layoutCache` ref persists positions across renders so nodes don't jump when the visible set changes incrementally. |
+| **Fit-to-view** | After initial render, `fitView()` is called with 0.2 padding after a 50 ms delay to ensure React Flow has measured the canvas. |
+
+**Force simulation parameters:** link distance = 120, charge strength = −300, center at (0, 0), collision radius = 40.
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#14)"]
+    subgraph Done ["✅ Done (#1–#17)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -377,10 +417,13 @@ flowchart LR
         T12["#12 Serve Command"]
         T13["#13 Status + Reset"]
         T14["#14 CLI Entry Point"]
+        T15["#15 Scaffold Frontend"]
+        T16["#16 Zustand Store"]
+        T17["#17 React Flow Canvas"]
     end
 
-    subgraph Tier5 ["⬜ Tier 5 — React UI"]
-        T15["#15–21 Frontend"]
+    subgraph Tier5 ["⬜ Tier 5 — React UI (remaining)"]
+        T18["#18–21 Frontend"]
     end
 
     Done --> Tier5
