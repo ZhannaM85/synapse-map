@@ -24,7 +24,7 @@ function formatDate(iso: string): string {
 }
 
 export default function NodeDetail() {
-    const { nodes, edges, selectedNodeId, selectNode, processedSessions } = useGraphStore();
+    const { nodes, edges, selectedNodeId, selectNode, processedSessions, expandedNodeId, hubNodeIds } = useGraphStore();
 
     const selectedNode = useMemo(
         () => nodes.find((n) => n.id === selectedNodeId) ?? null,
@@ -41,8 +41,9 @@ export default function NodeDetail() {
                 const neighbor = nodes.find((n) => n.id === neighborId);
                 return neighbor ? { node: neighbor, edgeWeight: e.weight } : null;
             })
-            .filter((r): r is { node: GraphNode; edgeWeight: number } => r !== null);
-    }, [selectedNodeId, edges, nodes]);
+            .filter((r): r is { node: GraphNode; edgeWeight: number } => r !== null)
+            .filter(({ node }) => expandedNodeId ? !hubNodeIds.has(node.id) : true);
+    }, [selectedNodeId, edges, nodes, expandedNodeId, hubNodeIds]);
 
     const conversationRefs = useMemo(() => {
         if (!selectedNode?.conversationRefs) return [];

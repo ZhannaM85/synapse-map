@@ -91,7 +91,7 @@ function computeLayout(
 }
 
 function GraphCanvasInner() {
-    const { nodes: storeNodes, edges: storeEdges, loadGraph, selectNode, selectedNodeId } =
+    const { nodes: storeNodes, edges: storeEdges, loadGraph, selectNode, selectedNodeId, setViewState } =
         useGraphStore();
     const { fitView } = useReactFlow();
     const { zoom } = useViewport();
@@ -113,18 +113,29 @@ function GraphCanvasInner() {
         [storeNodes, nodeWeightThreshold],
     );
 
+    useEffect(() => {
+        const expandedNodeId = expandedIds.size > 0 ? [...expandedIds][0]! : null;
+        setViewState(expandedNodeId, baseNodeIds);
+    }, [expandedIds, baseNodeIds, setViewState]);
+
+    const TARGET_EXPANDED_TOTAL = 20;
+
     const visibleNodeIds = useMemo(() => {
-        const ids = new Set(baseNodeIds);
+        if (expandedIds.size === 0) return new Set(baseNodeIds);
+
+        // Expanded view: show only neighbors that are NOT already hub nodes.
+        // This reveals the next layer down — concepts unique to this node's
+        // neighborhood that aren't visible at the top level.
+        const ids = new Set<string>();
         for (const id of expandedIds) {
-            // Show the top 15 neighbors that aren't already visible at the current LOD
             storeEdges
                 .filter((e) => {
                     if (e.source !== id && e.target !== id) return false;
                     const nbr = e.source === id ? e.target : e.source;
-                    return !baseNodeIds.has(nbr);
+                    return !baseNodeIds.has(nbr); // skip nodes already visible at hub level
                 })
                 .sort((a, b) => b.weight - a.weight)
-                .slice(0, 15)
+                .slice(0, TARGET_EXPANDED_TOTAL)
                 .forEach((e) => ids.add(e.source === id ? e.target : e.source));
         }
         return ids;
@@ -310,16 +321,23 @@ function GraphCanvasInner() {
         >
             <Background gap={20} size={1} color="#334155" />
             <Controls showInteractive={false} />
-            {expandedIds.size > 0 && (
-                <Panel position="top-left">
-                    <button
-                        onClick={resetView}
-                        className="rounded-md border border-border bg-muted px-3 py-1.5 text-xs text-foreground shadow transition-colors hover:bg-ring/20"
-                    >
-                        ← Back to hub view
-                    </button>
-                </Panel>
-            )}
+            <Panel position="top-left">
+                <div className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-3 py-1.5 text-xs text-foreground shadow">
+                    {expandedIds.size > 0 ? (
+                        <>
+                            <button onClick={resetView} className="text-muted-foreground transition-colors hover:text-foreground">
+                                Hub
+                            </button>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">
+                                {storeNodes.find((n) => n.id === [...expandedIds][0])?.label ?? ''}
+                            </span>
+                        </>
+                    ) : (
+                        <span className="text-muted-foreground">Hub view</span>
+                    )}
+                </div>
+            </Panel>
             <MiniMap
                 pannable
                 zoomable
