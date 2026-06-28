@@ -394,13 +394,14 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 |--------|---------|
 | `GraphNode` (re-export of `ApiNode`) | Node type used throughout the UI layer. |
 | `GraphEdge` (re-export of `ApiEdge`) | Edge type used throughout the UI layer. |
-| `useGraphStore` | Zustand store hook. Exposes `nodes`, `edges`, `processedSessions`, `selectedNodeId`, `searchQuery`, `isScanning`, `scanProgress`, and four actions. |
+| `useGraphStore` | Zustand store hook. Exposes `nodes`, `edges`, `processedSessions`, `selectedNodeId`, `focusNodeId`, `searchQuery`, `isScanning`, `scanProgress`, and six actions. |
 
-**State (added in #19):**
+**State (added in #19, extended in #20):**
 
 | Field | Purpose |
 |-------|---------|
 | `processedSessions` | `Record<string, ApiProcessedSession>` — session metadata (cwd, date) keyed by session ID. Populated by `loadGraph()` from the API's `processedSessions` map so `NodeDetail` can resolve `conversationRefs` to human-readable info without extra API calls. |
+| `focusNodeId` | Transient string set by `focusNode()` — signals `GraphCanvas` to pan-and-zoom to a specific node. Cleared immediately after the camera animation starts. Added in #20 so `SearchBar` can navigate the canvas to a search result. |
 
 **Actions:**
 
@@ -408,6 +409,8 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 |--------|-----------|
 | `loadGraph()` | Fetches `GET /api/graph`, converts the `Record<id, item>` maps to flat arrays, stores `processedSessions` map, and writes to `nodes`/`edges`. |
 | `selectNode(id)` | Sets `selectedNodeId`; pass `null` to deselect. |
+| `focusNode(id)` | Sets both `selectedNodeId` and `focusNodeId` so the canvas pans to the node and the sidebar opens simultaneously. Added in #20. |
+| `clearFocusNode()` | Resets `focusNodeId` to `null` after the camera animation has been triggered. Added in #20. |
 | `setSearchQuery(q)` | Updates `searchQuery` string (consumed by `SearchBar`). |
 | `triggerScan()` | POSTs to `/api/scan`, opens an SSE connection to `/api/scan/progress`, updates `scanProgress` (0–100) on each `progress` event, and calls `loadGraph()` on `complete`. Guards against concurrent scans with `isScanning`. |
 
@@ -466,6 +469,7 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 | **Edge weight encoding** | Edge stroke width scales linearly from 1 to 6 px based on weight relative to the visible maximum. |
 | **Layout caching** | `layoutCache` ref persists positions across renders so nodes don't jump when the visible set changes incrementally. |
 | **Fit-to-view** | After initial render, `fitView()` is called with 0.2 padding after a 50 ms delay to ensure React Flow has measured the canvas. |
+| **Focus-node fly-to** | When `focusNodeId` is set in the store (by `SearchBar`), the canvas calls `setCenter()` to smoothly pan and zoom (1.5×) to that node's layout position, then clears the flag. Added in #20. |
 
 **Force simulation parameters:** link distance = 120, charge strength = −300, center at (0, 0), collision radius = 40.
 
@@ -489,6 +493,40 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 | **Conversations** | `conversationRefs` resolved to session metadata via `processedSessions` from the store. Shows session ID (monospace), working directory, and processed date. Sorted by date descending. |
 
 **Internal helpers:** `TYPE_COLORS` is the same colour palette as `ConceptNode` (indigo for concept, emerald for project, etc.). `formatDate(iso)` formats ISO strings to locale-aware "MMM D, YYYY" display.
+
+---
+
+### `packages/app/src/components/SearchBar.tsx`
+**Why it exists:** The primary discovery mechanism for the knowledge graph. Users with thousands of nodes need a way to jump directly to a concept without scrolling or zooming — this component provides a `Cmd+K` / `Ctrl+K` command palette that searches nodes via the server's FTS5 index and navigates the canvas on selection.
+
+| Export | Purpose |
+|--------|---------|
+| `default` (`SearchBar` component) | Renders a trigger button (collapsed state) or a full `Command` palette (expanded state). Typing queries the `GET /api/search?q=` endpoint with 200 ms debounce. Selecting a result calls `focusNode(id)` to pan the canvas and open the sidebar simultaneously, then closes the palette. |
+
+**Key behaviours:**
+
+| Behaviour | Detail |
+|-----------|--------|
+| **Keyboard shortcut** | `Cmd+K` / `Ctrl+K` toggles the palette open/closed. `Escape` closes it. Listeners are registered on `document` and cleaned up on unmount. |
+| **Debounced search** | Input changes are debounced at 200 ms via a `setTimeout` ref to avoid hammering the API on fast typing. Empty queries clear results immediately without a network call. |
+| **Result display** | Each result row shows: a coloured type dot (same `TYPE_COLORS` palette as `ConceptNode`), the node label, node type text, and a weight `Badge`. |
+| **Server-side filtering** | `shouldFilter={false}` disables cmdk's built-in client-side filtering since results are already ranked by the FTS5 engine. |
+
+---
+
+### `packages/app/src/components/ui/command.tsx`
+**Why it exists:** shadcn/ui wrapper around the `cmdk` (Command Menu) library, styled with the project's dark-mode design tokens. Extracted as a shared UI primitive so `SearchBar` (and future command-palette features) get consistent styling without duplicating class strings.
+
+| Export | Purpose |
+|--------|---------|
+| `Command` | Root container — full-width flex column with `bg-card` background and rounded corners. Wraps `cmdk`'s `CommandPrimitive`. |
+| `CommandInput` | Text input with a bottom border divider. Transparent background so it inherits the card surface. Placeholder uses `text-muted-foreground`. |
+| `CommandList` | Scrollable results container capped at `max-h-72` (288 px) with hidden horizontal overflow. |
+| `CommandEmpty` | Centered message shown when no items match (e.g. "No results found." or "Type to search…"). |
+| `CommandGroup` | Groups items under an optional heading. Applies compact padding and muted heading styles via `[cmdk-group-heading]` attribute selectors. |
+| `CommandItem` | Individual result row — flex layout with `gap-2`, cursor pointer, and `data-[selected=true]` highlight using `bg-muted`. |
+
+All components are `forwardRef` wrappers that accept standard HTML/cmdk props plus `className` overrides via `cn()`.
 
 ---
 
@@ -534,7 +572,7 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#19)"]
+    subgraph Done ["✅ Done (#1–#20)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -552,10 +590,11 @@ flowchart LR
         T17["#17 React Flow Canvas"]
         T18["#18 Custom ConceptNode"]
         T19["#19 NodeDetail Sidebar"]
+        T20["#20 SearchBar"]
     end
 
     subgraph Tier5 ["⬜ Tier 5 — React UI (remaining)"]
-        T20["#20–21 Frontend"]
+        T21["#21 Frontend"]
     end
 
     Done --> Tier5
