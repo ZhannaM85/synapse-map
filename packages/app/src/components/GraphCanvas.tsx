@@ -91,9 +91,9 @@ function computeLayout(
 }
 
 function GraphCanvasInner() {
-    const { nodes: storeNodes, edges: storeEdges, loadGraph, selectNode, selectedNodeId, setViewState } =
+    const { nodes: storeNodes, edges: storeEdges, loadGraph, selectNode, selectedNodeId, focusNodeId, clearFocusNode, setViewState } =
         useGraphStore();
-    const { fitView } = useReactFlow();
+    const { fitView, setCenter } = useReactFlow();
     const { zoom } = useViewport();
 
     const lod = (zoom < 0.4 ? 0 : zoom < 0.7 ? 1 : zoom < 1.2 ? 2 : 3) as 0 | 1 | 2 | 3;
@@ -204,6 +204,15 @@ function GraphCanvasInner() {
         hasInitialFit.current = true;
         setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
     }, [layoutPositions]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!focusNodeId) return;
+        const pos = layoutPositions.get(focusNodeId);
+        if (pos) {
+            setCenter(pos.x, pos.y, { zoom: 1.5, duration: 400 });
+        }
+        clearFocusNode();
+    }, [focusNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const nodeById = useMemo(
         () => new Map(storeNodes.map((n) => [n.id, n])),
