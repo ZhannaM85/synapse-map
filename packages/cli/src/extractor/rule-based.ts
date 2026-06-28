@@ -98,8 +98,8 @@ export class RuleBasedExtractor implements Extractor {
 
     // Project: last path segment, skipping generic directory names
     const cwdParts = session.cwd.split(/[\\/]/).filter(Boolean);
-    const projectName = cwdParts.findLast(
-      p => !GENERIC_DIRS.has(p.toLowerCase()) && !/^[a-z]:$/i.test(p),
+    const projectName = cwdParts.slice().reverse().find(
+      (p) => !GENERIC_DIRS.has(p.toLowerCase()) && !/^[a-z]:$/i.test(p),
     );
     const projects = projectName ? [projectName] : [];
 
