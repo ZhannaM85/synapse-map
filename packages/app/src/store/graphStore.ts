@@ -8,6 +8,7 @@ interface GraphStore {
     edges: GraphEdge[];
     processedSessions: Record<string, ApiProcessedSession>;
     selectedNodeId: string | null;
+    focusNodeId: string | null;
     searchQuery: string;
     isScanning: boolean;
     scanProgress: number;
@@ -16,6 +17,8 @@ interface GraphStore {
 
     loadGraph: () => Promise<void>;
     selectNode: (id: string | null) => void;
+    focusNode: (id: string) => void;
+    clearFocusNode: () => void;
     setSearchQuery: (q: string) => void;
     triggerScan: () => void;
     setViewState: (expandedNodeId: string | null, previousLevelIds: Set<string>) => void;
@@ -26,6 +29,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     edges: [],
     processedSessions: {},
     selectedNodeId: null,
+    focusNodeId: null,
     searchQuery: '',
     isScanning: false,
     scanProgress: 0,
@@ -42,6 +46,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     },
 
     selectNode: (id) => set({ selectedNodeId: id }),
+    focusNode: (id) => set({ selectedNodeId: id, focusNodeId: id }),
+    clearFocusNode: () => set({ focusNodeId: null }),
     setViewState: (expandedNodeId, previousLevelIds) => set({ expandedNodeId, previousLevelIds }),
 
     setSearchQuery: (q) => set({ searchQuery: q }),
