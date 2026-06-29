@@ -24,11 +24,13 @@ flowchart TD
         G["Graph Canvas<br/>React Flow + d3-force"]
         H["Node Detail<br/>Sidebar"]
         I["Search Bar<br/>shadcn Command"]
+        J["Scan Progress<br/>SSE progress bar"]
     end
 
     F -- "REST API + SSE" --> G
     F -- "REST API" --> H
     F -- "GET /api/search" --> I
+    F -- "GET /api/scan/progress SSE" --> J
 
     style A fill:#f5f5f5,stroke:#999
     style CLI fill:#eff6ff,stroke:#3b82f6
@@ -416,6 +418,24 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 
 ---
 
+### `packages/app/src/App.tsx`
+**Why it exists:** Root component that composes the top-level layout — canvas, overlays, and sidebar — into a single full-screen shell. Centralising the layout here means child components never position themselves globally; they only fill their allocated slot.
+
+| Export | Purpose |
+|--------|---------|
+| `default` (`App` component) | Renders a full-viewport flex container with three layers: `ScanProgress` (absolute top bar, z-20), `SearchBar` (absolute centered top, z-10), `GraphCanvas` (fills remaining space), and `NodeDetail` (right sidebar). |
+
+---
+
+### `packages/app/src/components/ScanProgress.tsx`
+**Why it exists:** Provides real-time visual feedback during a scan so users know the system is working and can estimate remaining time. Reads `isScanning` and `scanProgress` from the Zustand store (which are driven by SSE events from `GET /api/scan/progress`), keeping the component stateless and decoupled from the SSE transport.
+
+| Export | Purpose |
+|--------|---------|
+| `default` (`ScanProgress` component) | Renders a thin (4 px) progress bar pinned to the top of the viewport. Width transitions smoothly via CSS `transition-[width]` at 300 ms ease-out. Returns `null` when `isScanning` is false so the bar is completely removed from the DOM between scans. |
+
+---
+
 ### `packages/app/src/components/ConceptNode.tsx`
 **Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via card size and badge, selection/hover via border glow — so users can scan the canvas and immediately spot important or related concepts without reading labels. Rebuilt in #18 to use shadcn Card + Badge instead of raw circles, giving each node a readable label and weight indicator.
 
@@ -572,7 +592,7 @@ All components are `forwardRef` wrappers that accept standard HTML/cmdk props pl
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#20)"]
+    subgraph Done ["✅ Done (#1–#21)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -591,11 +611,6 @@ flowchart LR
         T18["#18 Custom ConceptNode"]
         T19["#19 NodeDetail Sidebar"]
         T20["#20 SearchBar"]
+        T21["#21 ScanProgress"]
     end
-
-    subgraph Tier5 ["⬜ Tier 5 — React UI (remaining)"]
-        T21["#21 Frontend"]
-    end
-
-    Done --> Tier5
 ```
