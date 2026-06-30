@@ -266,13 +266,24 @@ erDiagram
 Added in issue #11. Exposes the SQLite graph over HTTP so the React frontend and browser-triggered scans can communicate with the CLI process.
 
 ### `packages/cli/src/server/app.ts`
-**Why it exists:** Factory that builds and configures the Express application. Separating app creation from server startup (`app.ts` vs a future `serve.ts`) keeps the API layer testable without binding to a port.
+**Why it exists:** Factory that builds and configures the Express application. Separating app creation from server startup (`app.ts` vs `commands/serve.ts`) keeps the API layer testable without binding to a port.
 
 | Export | Purpose |
 |--------|---------|
-| `createApp()` | Creates an Express app with `cors()` + `express.json()` middleware, mounts all four route groups at `/api/*`, and returns the configured app. |
+| `createApp()` | Creates an Express app with `cors()` + `express.json()` middleware, mounts all four route groups at `/api/*`, mounts static frontend serving via `serveStatic()` (added in #22), and returns the configured app. |
 
-Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api/status` → status · `/api/scan` → scan trigger + SSE.
+Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api/status` → status · `/api/scan` → scan trigger + SSE. Static serving is mounted last so the SPA catch-all route never shadows an API route.
+
+---
+
+### `packages/cli/src/server/static.ts`
+**Why it exists:** Added in #22. Isolates static frontend serving from API route wiring so `createApp()` — not just the `synapse serve` command — always serves the built React app, and so any future caller of `createApp()` (tests, alternate entry points) gets identical behaviour without duplicating filesystem logic.
+
+| Export | Purpose |
+|--------|---------|
+| `serveStatic(app)` | Mounts `express.static()` over the resolved `packages/cli/public/` directory, then registers a catch-all `GET *` route that serves `index.html` for any unmatched path — the standard single-page-app fallback so client-side routes don't 404 on a hard refresh. |
+
+**Path resolution:** `publicDir` is resolved once at module load from `fileURLToPath(import.meta.url)`, walked up two directories to `packages/cli/public/`. This matches the compiled output layout (`dist/server/static.js` → `../../public`). The Vite build (`packages/app/vite.config.ts`, `build.outDir`) writes the frontend bundle there; the root `prepare` script (see `index.ts` below) ensures that build runs automatically on `npm install`.
 
 ---
 
@@ -330,17 +341,17 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 | `synapse reset` | No options. Delegates to `runReset()`. |
 | Default (no subcommand) | Checks `process.argv.length <= 2`. If no DB exists, calls `runScan()` first, then always calls `runServe()`. Skips `program.parse()` entirely so Commander doesn't print help. |
 
-**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js" }`, so `npm install -g` or `npx` makes the `synapse` command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix.
+**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js" }`, so `npm install -g` or `npx` makes the `synapse` command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix. Added in #22: the root `prepare` script (`npm run build --workspace=packages/app`) builds the React frontend into `packages/cli/public/` automatically on `npm install`, so the static assets `server/static.ts` serves exist even when the package is installed from git rather than built manually.
 
 ---
 
 ### `packages/cli/src/commands/serve.ts`
-**Why it exists:** The user-facing entry point for the graph UI. Wires the Express API (`createApp()`) together with static file serving so the single `synapse serve` command starts the full stack — API + pre-built React frontend — in one process.
+**Why it exists:** The user-facing entry point for the graph UI. Starts the Express app — which already bundles the API and static frontend serving via `createApp()` — so the single `synapse serve` command runs the full stack in one process.
 
 | Export | Purpose |
 |--------|---------|
 | `ServeOptions` | `{ port?, open? }` — port defaults to 4242; `open` defaults to `true`. |
-| `runServe(options)` | Creates the Express app, mounts `packages/cli/public/` as a static directory (where the Vite build will output the React app), starts listening, logs the URL, and auto-opens the browser via the `open` package. |
+| `runServe(options)` | Creates the Express app via `createApp()`, starts listening, logs the URL, and auto-opens the browser via the `open` package. Static file serving moved into `server/static.ts` in #22, so this function no longer touches the filesystem directly. |
 
 ---
 
@@ -605,7 +616,7 @@ All components are `forwardRef` wrappers that accept standard HTML/cmdk props pl
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#21)"]
+    subgraph Done ["✅ Done (#1–#22)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -625,5 +636,6 @@ flowchart LR
         T19["#19 NodeDetail Sidebar"]
         T20["#20 SearchBar"]
         T21["#21 ScanProgress"]
+        T22["#22 Vite Output + Static Serving"]
     end
 ```

@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=packages/cli && npm run build --workspace=packages/app",
+    "prepare": "npm run build --workspace=packages/app",
     "dev": "concurrently -n app,api -c cyan,green \"npm run dev:app\" \"npm run dev:serve\"",
     "dev:app": "npm run dev --workspace=packages/app",
     "dev:serve": "tsx packages/cli/src/index.ts serve --no-open",

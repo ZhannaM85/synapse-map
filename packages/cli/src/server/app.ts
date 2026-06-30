@@ -4,6 +4,7 @@ import graphRoutes from './routes/graph.js';
 import searchRoutes from './routes/search.js';
 import statusRoutes from './routes/status.js';
 import scanRoutes from './routes/scan.js';
+import { serveStatic } from './static.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -15,6 +16,8 @@ export function createApp(): express.Express {
   app.use('/api/search', searchRoutes);
   app.use('/api/status', statusRoutes);
   app.use('/api/scan', scanRoutes);
+
+  serveStatic(app);
 
   return app;
 }
