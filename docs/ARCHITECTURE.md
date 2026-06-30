@@ -437,12 +437,24 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 ---
 
 ### `packages/app/src/components/ConceptNode.tsx`
-**Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via card size and badge, selection/hover via border glow — so users can scan the canvas and immediately spot important or related concepts without reading labels. Rebuilt in #18 to use shadcn Card + Badge instead of raw circles, giving each node a readable label and weight indicator.
+**Why it exists:** Custom React Flow node renderer that visually encodes graph metadata — node type via colour, weight via size/badge, selection/hover via border glow — so users can scan the canvas and immediately spot important or related concepts without reading labels. Rebuilt in #18 to use shadcn Card + Badge instead of raw circles. Extended in #34 with three distinct render modes (`dot` / `compact` / `card`) driven by zoom-level LOD so thousands of nodes can render at once without every node paying the cost of a full shadcn `Card` — far-zoom views stay cheap DOM (a single styled `div`) while close-up views keep the rich, readable card.
 
 | Export | Purpose |
 |--------|---------|
-| `ConceptNodeData` (type) | Shape of the data payload each React Flow node carries: `label`, `type`, `weight`, `highlighted`, `expanded`. Used by `GraphCanvas` when building the `Node<ConceptNodeData>[]` array. |
-| `default` (memoised component) | Renders a `Card` whose width scales with `weight` (40–120 px, clamped 1–20). Inside: title-cased label with scaled font size (9–13 px), a `Badge` showing the numeric weight (size/variant shift at thresholds 3, 5, 10), and a coloured dot indicating node type. Highlight state intensifies the border and adds a box-shadow glow. An absolute-positioned dot below the card signals the "expanded" state. Hidden handles on top/bottom connect edges without visible anchors. Wrapped in `memo` to avoid re-renders when siblings change. |
+| `ConceptNodeData` (type) | Shape of the data payload each React Flow node carries: `label`, `type`, `weight`, `highlighted`, `expanded`, optional `lod` (`0`–`3`, defaults to `3`/closest), optional `connections`. Used by `GraphCanvas` when building the `Node<ConceptNodeData>[]` array. |
+| `getRenderMode(lod, weight)` | Pure function mapping a node's LOD level + weight to a `RenderMode`. LOD 0 always renders `dot`. LOD 1 renders `compact` only if `weight >= 60`, else `dot`. LOD 2 renders `card` only if `weight >= 40`, else `compact`. LOD 3 always renders `card`. Exported so `GraphCanvas` can compute the same mode for sizing without duplicating the thresholds. |
+| `NODE_DIMENSIONS` | `Record<RenderMode, {width, height} | undefined>` — fixed pixel sizes for `dot` (24×24) and `compact` (90×44) so React Flow can size the node wrapper before render; `card` is `undefined` because its size is intrinsic (content-driven), matching pre-#34 behaviour. |
+| `default` (memoised component) | Picks a `RenderMode` via `getRenderMode(data.lod, data.weight)` and branches rendering accordingly (see Render modes below). Wrapped in `memo` to avoid re-renders when siblings change. |
+
+**Render modes (added in #34):**
+
+| Mode | Rendering | Used when |
+|------|-----------|-----------|
+| `dot` | A single coloured circle (`dotSize` 8–22 px, scaled by weight), no label. Highlight adds a glow ring. | Zoomed far out — cheapest possible node, used for the bulk of low-weight nodes at LOD 0/1. |
+| `compact` | The same coloured dot plus a truncated title-cased label (max 80 px wide, 9 px text) underneath. | Mid-zoom — enough detail to read labels without the cost of a full card. |
+| `card` | Full shadcn `Card` + `Badge` rendering (unchanged from #18): scaled font size (9–13 px), weight badge (size/variant shift at thresholds 3, 5, 10), type dot, expanded-state indicator dot, and the hover debug tooltip listing connections. | Zoomed in close, or any node whose weight clears the LOD threshold — the original "rich" rendering. |
+
+All three modes share hidden top/bottom `Handle`s so edges connect without visible anchors.
 
 **Colour palette:** `concept` → indigo, `project` → emerald, `function` → violet, `class` → purple, `module` → blue, `file` → cyan, `variable` → teal, `type` → amber, `interface` → orange. Falls back to slate for unknown types.
 
@@ -490,6 +502,7 @@ Added in issues #15–#17. The browser UI for exploring the knowledge graph, bui
 | **Layout caching** | `layoutCache` ref persists positions across renders so nodes don't jump when the visible set changes incrementally. |
 | **Fit-to-view** | After initial render, `fitView()` is called with 0.2 padding after a 50 ms delay to ensure React Flow has measured the canvas. |
 | **Focus-node fly-to** | When `focusNodeId` is set in the store (by `SearchBar`), the canvas calls `setCenter()` to smoothly pan and zoom (1.5×) to that node's layout position, then clears the flag. Added in #20. |
+| **LOD-driven node sizing** | Added in #34. `lod` (0–3) is derived from the current `zoom` level and passed into each node's `data`. Before building the React Flow node array, `NODE_DIMENSIONS[getRenderMode(lod, n.weight)]` (both imported from `ConceptNode.tsx`) is used to set an explicit `style` width/height for `dot`/`compact` nodes, so React Flow reserves the right amount of canvas space without waiting for the node to render before measuring. `card` mode nodes get no explicit style — their size stays intrinsic. |
 
 **Force simulation parameters:** link distance = 120, charge strength = −300, center at (0, 0), collision radius = 40.
 
