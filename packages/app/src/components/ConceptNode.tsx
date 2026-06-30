@@ -24,6 +24,8 @@ export type ConceptNodeData = {
 
 type ConceptNodeType = Node<ConceptNodeData, 'concept'>;
 
+type RenderMode = 'dot' | 'compact' | 'card';
+
 const TYPE_COLORS: Record<string, string> = {
     concept: '#6366f1',
     project: '#10b981',
@@ -36,6 +38,20 @@ const TYPE_COLORS: Record<string, string> = {
     interface: '#f97316',
 };
 
+export function getRenderMode(lod: 0 | 1 | 2 | 3 | undefined, weight: number): RenderMode {
+    const l = lod ?? 3;
+    return l === 0 ? 'dot'
+        : l === 1 ? (weight >= 60 ? 'compact' : 'dot')
+        : l === 2 ? (weight >= 40 ? 'card' : 'compact')
+        : 'card';
+}
+
+export const NODE_DIMENSIONS: Record<RenderMode, { width: number; height: number } | undefined> = {
+    dot: { width: 24, height: 24 },
+    compact: { width: 90, height: 44 },
+    card: undefined,
+};
+
 function toTitleCase(str: string): string {
     return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -43,14 +59,59 @@ function toTitleCase(str: string): string {
 function ConceptNode({ data }: NodeProps<ConceptNodeType>) {
     const clamped = Math.min(Math.max(data.weight, 1), 20);
     const t = (clamped - 1) / 19;
-    const fontSize = 9 + t * 4;
     const color = TYPE_COLORS[data.type] ?? '#64748b';
+    const renderMode = getRenderMode(data.lod, data.weight);
+    const dotSize = Math.round(8 + t * 14);
 
+    if (renderMode === 'dot') {
+        return (
+            <>
+                <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
+                <div
+                    style={{
+                        width: dotSize,
+                        height: dotSize,
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        opacity: data.highlighted ? 1 : 0.7,
+                        boxShadow: data.highlighted ? `0 0 0 3px ${color}30` : undefined,
+                    }}
+                />
+                <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
+            </>
+        );
+    }
+
+    if (renderMode === 'compact') {
+        return (
+            <>
+                <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
+                <div className="flex flex-col items-center gap-0.5">
+                    <div
+                        style={{
+                            width: dotSize,
+                            height: dotSize,
+                            borderRadius: '50%',
+                            backgroundColor: color,
+                            opacity: data.highlighted ? 1 : 0.7,
+                            boxShadow: data.highlighted ? `0 0 0 3px ${color}30` : undefined,
+                        }}
+                    />
+                    <span className="max-w-[80px] overflow-hidden text-ellipsis whitespace-nowrap text-[9px] leading-tight text-foreground">
+                        {toTitleCase(data.label)}
+                    </span>
+                </div>
+                <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
+            </>
+        );
+    }
+
+    // card mode — full rendering
+    const fontSize = 9 + t * 4;
     const badgeSize = clamped >= 10 ? 'lg' : clamped >= 3 ? ('default' as const) : 'sm';
     const badgeVariant = clamped >= 5 ? ('default' as const) : 'outline';
 
     const hiddenConns = data.connections?.filter((c) => !c.inView) ?? [];
-    const visibleConns = data.connections?.filter((c) => c.inView) ?? [];
     const totalConns = data.connections?.length ?? 0;
 
     return (

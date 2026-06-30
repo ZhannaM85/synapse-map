@@ -24,7 +24,7 @@ import {
 } from 'd3-force';
 
 import { useGraphStore, type GraphNode, type GraphEdge } from '../store/graphStore.js';
-import ConceptNode, { type ConceptNodeData } from './ConceptNode.js';
+import ConceptNode, { type ConceptNodeData, getRenderMode, NODE_DIMENSIONS } from './ConceptNode.js';
 
 // Higher zoom = fewer, more important nodes (like Google Maps: zoom in = your city, zoom out = whole world)
 const LOD_LEVELS = [
@@ -244,11 +244,13 @@ function GraphCanvasInner() {
                         };
                     });
 
+                const dims = NODE_DIMENSIONS[getRenderMode(lod, n.weight)];
                 return {
                     id: n.id,
                     type: 'concept' as const,
                     position: pos,
                     zIndex: n.id === hoveredNodeId ? 1000 : 1,
+                    style: dims,
                     data: {
                         label: n.label,
                         type: n.type,
