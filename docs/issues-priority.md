@@ -63,7 +63,7 @@ _Full graph visualization UI. #15 first (scaffold); then #16, #17; then the rest
 | ~~[#20](https://github.com/ZhannaM85/synapse-map/issues/20)~~ | ~~feat: implement SearchBar with shadcn Command palette~~ | ~~Depends on #15, #16~~ |
 | ~~[#21](https://github.com/ZhannaM85/synapse-map/issues/21)~~ | ~~feat: implement ScanProgress SSE component~~ | ~~Depends on #11, #16~~ |
 | [#33](https://github.com/ZhannaM85/synapse-map/issues/33) | feat: zoom-based LOD — filter nodes and edges by weight x zoom level | Depends on #17 — do before #34 |
-| [#34](https://github.com/ZhannaM85/synapse-map/issues/34) | feat: simplified node rendering modes (dot / compact / card) driven by LOD | Depends on #17, #33 |
+| ~~[#34](https://github.com/ZhannaM85/synapse-map/issues/34)~~ | ~~feat: simplified node rendering modes (dot / compact / card) driven by LOD~~ | ~~Depends on #17, #33~~ |
 
 ---
 
