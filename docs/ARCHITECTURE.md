@@ -330,7 +330,7 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 ---
 
 ### `packages/cli/src/index.ts`
-**Why it exists:** The single entry point for the entire CLI. Uses Commander.js to define the `synapse` command with four subcommands (`scan`, `serve`, `status`, `reset`), so users interact with one unified binary rather than separate scripts. Also implements zero-config default behavior: running `synapse` with no arguments auto-scans (if no database exists) then launches the web UI — the most common workflow in a single keystroke.
+**Why it exists:** The single entry point for the entire CLI. Uses Commander.js to define the `synapse` command with five subcommands (`scan`, `serve`, `status`, `reset`, `hook`), so users interact with one unified binary rather than separate scripts. Also implements zero-config default behavior: running `synapse` with no arguments auto-scans (if no database exists) then launches the web UI — the most common workflow in a single keystroke.
 
 | Export / Behavior | Purpose |
 |-------------------|---------|
@@ -339,9 +339,10 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 | `synapse serve` | `-p, --port <number>` (default 4242); `--no-open` suppresses browser launch. Delegates to `runServe()`. |
 | `synapse status` | No options. Delegates to `runStatus()`. |
 | `synapse reset` | No options. Delegates to `runReset()`. |
+| `synapse hook install` / `synapse hook uninstall` | Added in #24. Delegates to `runHookInstall()` / `runHookUninstall()`. |
 | Default (no subcommand) | Checks `process.argv.length <= 2`. If no DB exists, calls `runScan()` first, then always calls `runServe()`. Skips `program.parse()` entirely so Commander doesn't print help. |
 
-**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js" }`, so `npm install -g` or `npx` makes the `synapse` command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix. Added in #22: the root `prepare` script (`npm run build --workspace=packages/app`) builds the React frontend into `packages/cli/public/` automatically on `npm install`, so the static assets `server/static.ts` serves exist even when the package is installed from git rather than built manually.
+**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js", "synapse-map": "./dist/index.js" }` (the `synapse-map` alias was added in #24 so the literal command written into the Claude Code Stop hook resolves after a global install), so `npm install -g` or `npx` makes either command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix. Added in #22: the root `prepare` script (`npm run build --workspace=packages/app`) builds the React frontend into `packages/cli/public/` automatically on `npm install`, so the static assets `server/static.ts` serves exist even when the package is installed from git rather than built manually. Added in #24: a `postinstall` script (`scripts/postinstall.js`) prints a reminder to run `synapse-map hook install` after every `npm install`.
 
 ---
 
@@ -370,6 +371,19 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 | Export | Purpose |
 |--------|---------|
 | `runReset()` | Checks whether `~/.synapse/graph.db` exists, then prompts `[y/N]` for confirmation. On `y`: calls `closeDb()` to release the SQLite connection, then `unlinkSync` to delete the file. Prints "Aborted." on anything else. |
+
+---
+
+### `packages/cli/src/commands/hook.ts`
+**Why it exists:** Added in #24. Lets the graph refresh itself without the user remembering to run `synapse scan`. Claude Code's `Stop` hook fires a shell command after every conversation, so wiring `synapse-map scan` into it keeps the graph current automatically — the scan's SHA-256 hash check (`isSessionProcessed` in `graph/store.ts`) means the hook only pays the cost of the one session that just finished, not a full re-scan.
+
+| Export | Purpose |
+|--------|---------|
+| `CLAUDE_SETTINGS_PATH` | `~/.claude/settings.json` — the same config file Claude Code itself reads for hooks, permissions, etc. |
+| `runHookInstall()` | Reads and JSON-parses the existing settings file (treats a missing file as `{}`). Appends a `{ type: 'command', command: 'synapse-map scan' }` entry to the empty-matcher (`matcher: ''`, i.e. runs on every Stop event) block under `hooks.Stop`, creating that structure if absent — merging non-destructively so any existing hooks, matchers, or unrelated settings keys are preserved untouched. No-ops with a message if the hook is already present. |
+| `runHookUninstall()` | Removes only the `synapse-map scan` command entry from every `hooks.Stop` matcher, then prunes any matcher left with zero hooks and the `Stop` / `hooks` keys entirely if they end up empty — so uninstalling never leaves dangling empty structures behind. No-ops with a message if there's nothing to remove. |
+
+**Package wiring:** `package.json` adds a `synapse-map` bin alias (see `index.ts` below) so the hook's literal `synapse-map scan` command resolves once the package is installed globally, and a `postinstall` script reminds the user to run `synapse hook install`.
 
 ---
 
@@ -616,7 +630,7 @@ All components are `forwardRef` wrappers that accept standard HTML/cmdk props pl
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#22)"]
+    subgraph Done ["✅ Done (#1–#22, #24)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -637,5 +651,6 @@ flowchart LR
         T20["#20 SearchBar"]
         T21["#21 ScanProgress"]
         T22["#22 Vite Output + Static Serving"]
+        T24["#24 Stop Hook Auto-Refresh"]
     end
 ```

@@ -6,6 +6,7 @@ import { runScan } from './commands/scan.js';
 import { runServe } from './commands/serve.js';
 import { runStatus } from './commands/status.js';
 import { runReset } from './commands/reset.js';
+import { runHookInstall, runHookUninstall } from './commands/hook.js';
 import { DB_PATH } from './graph/store.js';
 
 const program = new Command();
@@ -45,6 +46,24 @@ program
   .description('Delete the graph database')
   .action(() => {
     runReset();
+  });
+
+const hook = program
+  .command('hook')
+  .description('Manage the Claude Code Stop hook that keeps the graph updated automatically');
+
+hook
+  .command('install')
+  .description('Add a Stop hook to ~/.claude/settings.json that runs synapse-map scan after each conversation')
+  .action(() => {
+    runHookInstall();
+  });
+
+hook
+  .command('uninstall')
+  .description('Remove the Stop hook from ~/.claude/settings.json')
+  .action(() => {
+    runHookUninstall();
   });
 
 // Default behavior: no subcommand given

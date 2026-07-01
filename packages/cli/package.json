@@ -4,16 +4,19 @@
   "description": "Transform your Claude Code conversations into a living knowledge graph",
   "type": "module",
   "bin": {
-    "synapse": "./dist/index.js"
+    "synapse": "./dist/index.js",
+    "synapse-map": "./dist/index.js"
   },
   "files": [
     "dist/",
-    "public/"
+    "public/",
+    "scripts/"
   ],
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "tsx watch src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/postinstall.js"
   },
   "dependencies": {
     "commander": "^12.1.0",
