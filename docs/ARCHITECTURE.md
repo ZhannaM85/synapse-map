@@ -56,7 +56,7 @@ sequenceDiagram
         U->>S: isSessionProcessed(id, hash)?
         S-->>U: false (new/changed)
         U->>R: parseSession(path)
-        R-->>U: ParsedSession {userMessages[]}
+        R-->>U: ParsedSession {userMessages[], recaps[]}
         U->>E: extract(session)
         E-->>U: ExtractionResult {topics[], projects[]}
         U->>B: mergeExtraction(graph, result)
@@ -80,7 +80,7 @@ sequenceDiagram
 | `GraphEdge` | A connection between two nodes. `id` is always sorted alphabetically (`"react→typescript"`) to prevent duplicate edges. `weight` counts co-occurrences. |
 | `KnowledgeGraph` | The full graph: `nodes` and `edges` stored as `Record<id, item>` (not arrays) for O(1) merge lookups. |
 | `ProcessedSession` | Tracks which sessions have been indexed. `fileHash` (SHA-256) enables incremental scans — if the file hasn't changed, skip it. |
-| `ParsedSession` | Output of the reader: the session's user messages as plain text, ready for extraction. |
+| `ParsedSession` | Output of the reader: the session's user messages as plain text, ready for extraction. Extended in #42 with `recaps` — end-of-session recap summaries collected from `system`/`away_summary` entries. |
 | `ExtractionResult` | Output of the extractor: lists of topic and project labels extracted from one session. |
 | `emptyGraph()` | Factory that creates a blank `KnowledgeGraph`. Used when no DB exists yet. |
 
@@ -92,7 +92,7 @@ sequenceDiagram
 | Function | Purpose |
 |----------|---------|
 | `getAllSessions()` | Walks `~/.claude/projects/` recursively and returns every `.jsonl` file path found. |
-| `parseSession(filePath)` | Reads one `.jsonl` file. Extracts only `type === "user"` lines — assistant messages and system events are skipped. Handles two content formats: plain `string` and `array` (tool results mixed with text). Strips Claude Code system tags (`<system-reminder>`, `<bash-input>`, etc.) using a regex so only real user prose reaches the extractor. Returns `null` if the session has no usable messages. |
+| `parseSession(filePath)` | Reads one `.jsonl` file. Extracts `type === "user"` lines — assistant messages and system events are skipped — plus (added in #42) `type === "system"` / `subtype === "away_summary"` entries: the LLM-written end-of-session recaps Claude Code stores in every transcript, collected into `recaps` with the `(disable recaps in /config)` UI suffix stripped. Handles two content formats: plain `string` and `array` (tool results mixed with text). Strips Claude Code system tags (`<system-reminder>`, `<bash-input>`, etc.) using a regex so only real user prose reaches the extractor. Returns `null` if the session has no usable messages. The recap format is an undocumented Claude Code internal — extraction supplements the other layers and degrades gracefully when recaps are absent. |
 | `hashFile(filePath)` | SHA-256 of the raw file bytes. Used by `isSessionProcessed()` to skip unchanged sessions on re-scan. |
 
 ---
@@ -148,18 +148,19 @@ No model download — compromise is pure JavaScript, works fully offline.
 ---
 
 ### `packages/cli/src/extractor/rule-based.ts`
-**Why it exists:** Combines all three extraction layers (vocabulary, TF-IDF, NLP) into a single class that implements the `Extractor` interface. This is the default engine for phase 1.
+**Why it exists:** Combines all four extraction layers (vocabulary, TF-IDF, NLP, session recaps) into a single class that implements the `Extractor` interface. This is the default engine for phase 1.
 
 | Export | Purpose |
 |--------|---------|
-| `RuleBasedExtractor` | Class that wraps all three extraction layers. Constructor takes the full list of parsed sessions so it can build the TF-IDF corpus up front. `extract(session)` runs all three layers, normalises results through the alias table and vocabulary canonical forms, and returns the deduped `ExtractionResult`. |
+| `RuleBasedExtractor` | Class that wraps all four extraction layers. Constructor takes the full list of parsed sessions so it can build the TF-IDF corpus up front (recaps are included in each session's corpus document since #42). `extract(session)` runs all four layers, normalises results through the alias table and vocabulary canonical forms, and returns the deduped `ExtractionResult`. |
 
 **How layers are combined:**
 1. **Layer 1 (vocabulary)** — 391 precompiled regex patterns, run against the full message text. Fastest, highest confidence.
 2. **Layer 2 (TF-IDF)** — up to 20 high-scoring tokens per session. Each token is normalised: aliases table → vocabulary canonical → title-case unknown words.
 3. **Layer 3 (NLP)** — compromise noun phrases from the first 8000 chars of message text (capped for speed). Same normalisation pipeline.
+4. **Layer 4 (session recaps)** — added in #42. Vocabulary matching + noun-phrase extraction over the session's `recaps` (LLM-written end-of-session summaries). Recaps are short, clean prose with high signal density, so the full text is processed — no 8000-char sampling. Sessions without recaps skip this layer entirely.
 
-All three layers write into a single `Set<string>` so deduplication is free. Project name is extracted from the last path segment of `session.cwd`.
+All four layers write into a single `Set<string>` so deduplication is free. Project name is extracted from the last path segment of `session.cwd`.
 
 Also includes `escapeRe()` (local helper for building vocab regex) and `normalizeToken()` (alias → vocab → title-case pipeline, filters tokens < 3 chars).
 
@@ -650,7 +651,7 @@ Added in issue #25. Automates publishing the CLI package to npm so releases no l
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#22, #24–#25)"]
+    subgraph Done ["✅ Done (#1–#22, #24–#25, #42)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -673,5 +674,6 @@ flowchart LR
         T22["#22 Vite Output + Static Serving"]
         T24["#24 Stop Hook Auto-Refresh"]
         T25["#25 npm Publish Workflow"]
+        T42["#42 Session Recap Extraction"]
     end
 ```
