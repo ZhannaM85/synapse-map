@@ -19,6 +19,10 @@ export function toSlug(label: string): string {
     .replace(/^-|-$/g, '');       // trim leading/trailing hyphens
 }
 
+// Only this many nodes per session participate in co-occurrence edge
+// generation (≤190 pairs). Projects + highest-confidence topics make the cut.
+const MAX_EDGE_NODES = 20;
+
 // Merges one session's extraction result into the knowledge graph in place.
 // Returns the mutated graph (same reference) for easy chaining.
 export function mergeSession(
@@ -30,15 +34,10 @@ export function mergeSession(
   const now = new Date().toISOString();
   // id → whether this session was newly counted for that node in this merge.
   // Deduped by id: a topic and a project can slug to the same node.
+  // Insertion order matters — edge generation below keeps only the first
+  // MAX_EDGE_NODES ids, so projects go in first (they anchor concepts to the
+  // project), followed by topics in extraction-confidence order.
   const counted = new Map<string, boolean>();
-
-  // ── Upsert concept nodes ────────────────────────────────────────────────────
-  for (const label of result.topics) {
-    const id = toSlug(label);
-    if (!id) continue;
-    const isNew = upsertNode(graph, id, label, 'concept', session.sessionId, session.timestamp, now);
-    counted.set(id, (counted.get(id) ?? false) || isNew);
-  }
 
   // ── Upsert project nodes ────────────────────────────────────────────────────
   for (const name of result.projects) {
@@ -48,8 +47,20 @@ export function mergeSession(
     counted.set(id, (counted.get(id) ?? false) || isNew);
   }
 
+  // ── Upsert concept nodes ────────────────────────────────────────────────────
+  for (const label of result.topics) {
+    const id = toSlug(label);
+    if (!id) continue;
+    const isNew = upsertNode(graph, id, label, 'concept', session.sessionId, session.timestamp, now);
+    counted.set(id, (counted.get(id) ?? false) || isNew);
+  }
+
   // ── Upsert co-occurrence edges ──────────────────────────────────────────────
-  const edgeNodes = Array.from(counted.keys());
+  // Cap pair generation to the highest-confidence nodes: sessions routinely
+  // extract 80+ topics, and all-pairs over those is O(n²) co-occurrence noise
+  // that swamps the graph (#45). All nodes are still upserted above — the cap
+  // only limits which ones form edges.
+  const edgeNodes = Array.from(counted.keys()).slice(0, MAX_EDGE_NODES);
   for (let i = 0; i < edgeNodes.length; i++) {
     for (let j = i + 1; j < edgeNodes.length; j++) {
       const [a, b] = [edgeNodes[i]!, edgeNodes[j]!].sort();

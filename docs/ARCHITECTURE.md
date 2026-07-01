@@ -81,7 +81,7 @@ sequenceDiagram
 | `KnowledgeGraph` | The full graph: `nodes` and `edges` stored as `Record<id, item>` (not arrays) for O(1) merge lookups. |
 | `ProcessedSession` | Tracks which sessions have been indexed. `fileHash` (SHA-256) enables incremental scans — if the file hasn't changed, skip it. |
 | `ParsedSession` | Output of the reader: the session's user messages as plain text, ready for extraction. Extended in #42 with `recaps` — end-of-session recap summaries collected from `system`/`away_summary` entries. |
-| `ExtractionResult` | Output of the extractor: lists of topic and project labels extracted from one session. |
+| `ExtractionResult` | Output of the extractor: lists of topic and project labels extracted from one session. Since #45 `topics` is ordered by extraction confidence (highest first) — `mergeSession` keeps only the earliest entries when capping edge generation. |
 | `emptyGraph()` | Factory that creates a blank `KnowledgeGraph`. Used when no DB exists yet. |
 
 ---
@@ -154,13 +154,13 @@ No model download — compromise is pure JavaScript, works fully offline.
 |--------|---------|
 | `RuleBasedExtractor` | Class that wraps all four extraction layers. Constructor takes the full list of parsed sessions so it can build the TF-IDF corpus up front (recaps are included in each session's corpus document since #42). `extract(session)` runs all four layers, normalises results through the alias table and vocabulary canonical forms, and returns the deduped `ExtractionResult`. |
 
-**How layers are combined:**
+**How layers are combined** (order rearranged in #45 — layers run highest-confidence first because insertion order doubles as the confidence rank `mergeSession` uses when capping edge generation):
 1. **Layer 1 (vocabulary)** — 391 precompiled regex patterns, run against the full message text. Fastest, highest confidence.
-2. **Layer 2 (TF-IDF)** — up to 20 high-scoring tokens per session. Each token is normalised: aliases table → vocabulary canonical → title-case unknown words.
-3. **Layer 3 (NLP)** — compromise noun phrases from the first 8000 chars of message text (capped for speed). Same normalisation pipeline.
-4. **Layer 4 (session recaps)** — added in #42. Vocabulary matching + noun-phrase extraction over the session's `recaps` (LLM-written end-of-session summaries). Recaps are short, clean prose with high signal density, so the full text is processed — no 8000-char sampling. Sessions without recaps skip this layer entirely.
+2. **Layer 2 (session recaps)** — added in #42. Vocabulary matching + noun-phrase extraction over the session's `recaps` (LLM-written end-of-session summaries). Recaps are short, clean prose with high signal density, so the full text is processed — no 8000-char sampling. Sessions without recaps skip this layer entirely.
+3. **Layer 3 (TF-IDF)** — up to 20 high-scoring tokens per session, in score-descending order. Each token is normalised: aliases table → vocabulary canonical → title-case unknown words.
+4. **Layer 4 (NLP)** — compromise noun phrases from the first 8000 chars of message text (capped for speed). Same normalisation pipeline. Lowest confidence, so it goes last.
 
-All four layers write into a single `Set<string>` so deduplication is free. Project name is extracted from the last path segment of `session.cwd`.
+All four layers write into a single `Set<string>` so deduplication is free and topic order reflects confidence. Project name is extracted from the last path segment of `session.cwd`.
 
 Also includes `escapeRe()` (local helper for building vocab regex) and `normalizeToken()` (alias → vocab → title-case pipeline, filters tokens < 3 chars).
 
@@ -184,7 +184,7 @@ Added to `types.ts` so the interface lives with its input/output types. Future L
 | Export | Purpose |
 |--------|---------|
 | `toSlug(label)` | Converts a canonical label to a stable URL-safe node ID. Deterministic: same label always → same slug. Handles C++ → `cpp`, C# → `csharp`, Next.js → `next-js`, spaces → hyphens. |
-| `mergeSession(graph, session, result, fileHash)` | Upserts all topics and projects from one `ExtractionResult` into the graph. Increments `weight` and appends `sessionId` to `conversationRefs` for existing nodes (idempotent — duplicate session IDs are skipped). Creates `related` edges for pairs of nodes in the session; since #44 a pair is only counted when the session is newly counted for at least one endpoint, so re-processing a session (`scan --force`) never inflates edge weights, and node ids are deduped before pairing so a topic and project slugging to the same id can't create a self-edge. No per-session cap on pair generation yet — see #45. Records the session in `processedSessions` with its file hash. |
+| `mergeSession(graph, session, result, fileHash)` | Upserts all topics and projects from one `ExtractionResult` into the graph. Increments `weight` and appends `sessionId` to `conversationRefs` for existing nodes (idempotent — duplicate session IDs are skipped). Creates `related` edges for pairs of nodes in the session; since #44 a pair is only counted when the session is newly counted for at least one endpoint, so re-processing a session (`scan --force`) never inflates edge weights, and node ids are deduped before pairing so a topic and project slugging to the same id can't create a self-edge. Since #45 edge generation is capped to the first `MAX_EDGE_NODES` (20) ids — projects first, then topics in extraction-confidence order — so a session contributes at most 190 pairs instead of O(n²) over 80+ topics; all nodes are still upserted, the cap only limits pairing. Records the session in `processedSessions` with its file hash. |
 
 **Edge ID format:** `[slugA]→[slugB]` with slugs sorted alphabetically — guarantees no duplicate edges regardless of extraction order.
 
