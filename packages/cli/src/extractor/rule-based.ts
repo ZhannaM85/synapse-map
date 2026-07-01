@@ -66,7 +66,9 @@ export class RuleBasedExtractor implements Extractor {
   // allSessions must include the sessions you'll call extract() on — they're
   // needed to build the TF-IDF corpus so IDF scores reflect the full dataset.
   constructor(allSessions: ParsedSession[]) {
-    this.corpus = buildCorpus(allSessions.map(s => s.userMessages));
+    // Recaps are part of the corpus documents so their terms carry TF-IDF
+    // scores alongside the user messages.
+    this.corpus = buildCorpus(allSessions.map(s => [...s.userMessages, ...s.recaps]));
     this.sessionIndexMap = new Map(allSessions.map((s, i) => [s.sessionId, i]));
   }
 
@@ -94,6 +96,20 @@ export class RuleBasedExtractor implements Extractor {
     for (const phrase of extractNounPhrases(sampleText)) {
       const norm = normalizeToken(phrase);
       if (norm) labels.add(norm);
+    }
+
+    // Layer 4 — session recaps: LLM-written end-of-session summaries.
+    // Short, clean prose with high signal density — vocabulary and NLP both
+    // run over the full text (no sampling needed, unlike raw messages).
+    const recapText = stripUrls(session.recaps.join('\n'));
+    if (recapText) {
+      for (const term of matchVocabulary(recapText)) {
+        labels.add(term);
+      }
+      for (const phrase of extractNounPhrases(recapText)) {
+        const norm = normalizeToken(phrase);
+        if (norm) labels.add(norm);
+      }
     }
 
     // Project: last path segment, skipping generic directory names
