@@ -74,5 +74,5 @@ _Packaging, wiring the build pipeline, and documentation. Do last — the tool s
 |---|-------|-------|
 | ~~[#22](https://github.com/ZhannaM85/synapse-map/issues/22)~~ | ~~feat: configure Vite output to packages/cli/public/ and wire CLI static serving~~ | ~~Depends on #15 — makes CLI self-contained for npm publish~~ |
 | ~~[#24](https://github.com/ZhannaM85/synapse-map/issues/24)~~ | ~~feat: auto-refresh graph via Claude Code Stop hook~~ | ~~`synapse-map hook install` wires a Stop hook into ~/.claude/settings.json; requires CLI installed globally~~ |
-| [#25](https://github.com/ZhannaM85/synapse-map/issues/25) | feat: GitHub Actions workflow for automated npm publishing | Needs NPM_TOKEN secret; triggers on version tags (v*) |
+| ~~[#25](https://github.com/ZhannaM85/synapse-map/issues/25)~~ | ~~feat: GitHub Actions workflow for automated npm publishing~~ | ~~Needs NPM_TOKEN secret; triggers on version tags (v*)~~ |
 | [#23](https://github.com/ZhannaM85/synapse-map/issues/23) | docs: README with install and usage instructions | Do last |
