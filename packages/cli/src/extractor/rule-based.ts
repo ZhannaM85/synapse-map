@@ -75,6 +75,9 @@ export class RuleBasedExtractor implements Extractor {
   extract(session: ParsedSession): ExtractionResult {
     const rawText = session.userMessages.join('\n');
     const text = stripUrls(rawText);
+    // Insertion order doubles as confidence rank: layers run highest-confidence
+    // first, and mergeSession keeps only the earliest topics when capping
+    // co-occurrence edge generation (#45).
     const labels = new Set<string>();
 
     // Layer 1 — vocabulary matching: fastest, highest-confidence, curated terms
@@ -82,23 +85,7 @@ export class RuleBasedExtractor implements Extractor {
       labels.add(term);
     }
 
-    // Layer 2 — TF-IDF: surfaces session-specific terms not in the vocabulary
-    const sessionIndex = this.sessionIndexMap.get(session.sessionId) ?? -1;
-    if (sessionIndex >= 0) {
-      for (const token of topTermsForSession(session.userMessages, this.corpus, sessionIndex, 20)) {
-        const norm = normalizeToken(token);
-        if (norm) labels.add(norm);
-      }
-    }
-
-    // Layer 3 — NLP: catches multi-word proper noun phrases
-    const sampleText = text.slice(0, 8000);
-    for (const phrase of extractNounPhrases(sampleText)) {
-      const norm = normalizeToken(phrase);
-      if (norm) labels.add(norm);
-    }
-
-    // Layer 4 — session recaps: LLM-written end-of-session summaries.
+    // Layer 2 — session recaps: LLM-written end-of-session summaries.
     // Short, clean prose with high signal density — vocabulary and NLP both
     // run over the full text (no sampling needed, unlike raw messages).
     const recapText = stripUrls(session.recaps.join('\n'));
@@ -110,6 +97,23 @@ export class RuleBasedExtractor implements Extractor {
         const norm = normalizeToken(phrase);
         if (norm) labels.add(norm);
       }
+    }
+
+    // Layer 3 — TF-IDF: surfaces session-specific terms not in the vocabulary.
+    // topTermsForSession returns tokens sorted by score descending.
+    const sessionIndex = this.sessionIndexMap.get(session.sessionId) ?? -1;
+    if (sessionIndex >= 0) {
+      for (const token of topTermsForSession(session.userMessages, this.corpus, sessionIndex, 20)) {
+        const norm = normalizeToken(token);
+        if (norm) labels.add(norm);
+      }
+    }
+
+    // Layer 4 — NLP: catches multi-word proper noun phrases
+    const sampleText = text.slice(0, 8000);
+    for (const phrase of extractNounPhrases(sampleText)) {
+      const norm = normalizeToken(phrase);
+      if (norm) labels.add(norm);
     }
 
     // Project: last path segment, skipping generic directory names

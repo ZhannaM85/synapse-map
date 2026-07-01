@@ -55,7 +55,9 @@ export interface ParsedSession {
 // Phase 1: topics and projects only.
 // decisions / questions / artifacts added when LLM extraction is introduced.
 export interface ExtractionResult {
-  topics: string[];            // canonical labels: ["React", "TypeScript", "Docker"]
+  topics: string[];            // canonical labels, ordered by extraction confidence
+                               // (highest first) — mergeSession caps edge generation
+                               // to the earliest entries
   projects: string[];          // project names inferred from cwd or message content
 }
 
