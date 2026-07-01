@@ -54,6 +54,7 @@ export function parseSession(filePath: string): ParsedSession | null {
   const lines = readFileSync(filePath, 'utf8').split('\n').filter(Boolean);
 
   const userMessages: string[] = [];
+  const recaps: string[] = [];
   let sessionId = basename(filePath, '.jsonl');
   let cwd = '';
   let timestamp = '';
@@ -64,6 +65,17 @@ export function parseSession(filePath: string): ParsedSession | null {
       entry = JSON.parse(line) as Record<string, unknown>;
     } catch {
       continue; // skip malformed lines
+    }
+
+    // End-of-session recaps — LLM-written summaries Claude Code stores as
+    // system/away_summary entries. Undocumented internal format: collected
+    // when present, but extraction must not depend on them existing.
+    if (entry['type'] === 'system' && entry['subtype'] === 'away_summary') {
+      const content = typeof entry['content'] === 'string' ? entry['content'] : '';
+      // Drop the UI hint suffix — it's display chrome, not session content.
+      const recap = content.replace(/\s*\(disable recaps in \/config\)\s*$/i, '').trim();
+      if (recap) recaps.push(recap);
+      continue;
     }
 
     if (entry['type'] !== 'user') continue;
@@ -82,5 +94,5 @@ export function parseSession(filePath: string): ParsedSession | null {
 
   if (userMessages.length === 0) return null;
 
-  return { sessionId, filePath, cwd, timestamp, userMessages };
+  return { sessionId, filePath, cwd, timestamp, userMessages, recaps };
 }

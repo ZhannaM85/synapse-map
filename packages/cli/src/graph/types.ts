@@ -49,6 +49,7 @@ export interface ParsedSession {
   cwd: string;
   timestamp: string;           // ISO timestamp of the first user message
   userMessages: string[];      // text of user messages only; assistant messages excluded
+  recaps: string[];            // end-of-session recap summaries (system/away_summary entries)
 }
 
 // Phase 1: topics and projects only.
