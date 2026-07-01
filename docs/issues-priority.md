@@ -36,6 +36,8 @@ _Core domain logic: merge algorithm, slug generation, and the scan orchestration
 |---|-------|-------|
 | ~~[#9](https://github.com/ZhannaM85/synapse-map/issues/9)~~ | ~~feat: implement slug generation, alias table, and graph merge algorithm~~ | ~~Depends on #2, #8~~ |
 | ~~[#10](https://github.com/ZhannaM85/synapse-map/issues/10)~~ | ~~feat: implement synapse scan command~~ | ~~Depends on #3, #4, #8, #9 — completes the full scan pipeline~~ |
+| [#44](https://github.com/ZhannaM85/synapse-map/issues/44) | fix: edge weights double-counted when a session is re-processed (--force) | Correctness bug in mergeSession — do before #45; existing DBs need reset + rescan after |
+| [#45](https://github.com/ZhannaM85/synapse-map/issues/45) | fix: cap co-occurrence edge generation per session (O(n²) explosion) | Interacts with #44 — docs claim a 20-node cap that was never implemented |
 
 ---
 
