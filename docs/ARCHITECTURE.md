@@ -342,7 +342,7 @@ Route mounts: `/api/graph` → graph routes · `/api/search` → search · `/api
 | `synapse hook install` / `synapse hook uninstall` | Added in #24. Delegates to `runHookInstall()` / `runHookUninstall()`. |
 | Default (no subcommand) | Checks `process.argv.length <= 2`. If no DB exists, calls `runScan()` first, then always calls `runServe()`. Skips `program.parse()` entirely so Commander doesn't print help. |
 
-**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js", "synapse-map": "./dist/index.js" }` (the `synapse-map` alias was added in #24 so the literal command written into the Claude Code Stop hook resolves after a global install), so `npm install -g` or `npx` makes either command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix. Added in #22: the root `prepare` script (`npm run build --workspace=packages/app`) builds the React frontend into `packages/cli/public/` automatically on `npm install`, so the static assets `server/static.ts` serves exist even when the package is installed from git rather than built manually. Added in #24: a `postinstall` script (`scripts/postinstall.js`) prints a reminder to run `synapse-map hook install` after every `npm install`.
+**Package wiring:** `package.json` declares `"bin": { "synapse": "./dist/index.js", "synapse-map": "./dist/index.js" }` (the `synapse-map` alias was added in #24 so the literal command written into the Claude Code Stop hook resolves after a global install), so `npm install -g` or `npx` makes either command available system-wide. The `#!/usr/bin/env node` shebang enables direct execution on Unix. Added in #22: the root `prepare` script builds the React frontend into `packages/cli/public/` automatically on `npm install`, so the static assets `server/static.ts` serves exist even when the package is installed from git rather than built manually. Widened in #25 from `npm run build --workspace=packages/app` to `npm run build` (both workspaces), so `npm ci` in the [publish workflow](#githubworkflowspublishyml) also produces a fresh `packages/cli/dist/` before the workflow's typecheck and publish steps run. Added in #24: a `postinstall` script (`scripts/postinstall.js`) prints a reminder to run `synapse-map hook install` after every `npm install`.
 
 ---
 
@@ -626,11 +626,31 @@ All components are `forwardRef` wrappers that accept standard HTML/cmdk props pl
 
 ---
 
+## CI/CD
+
+Added in issue #25. Automates publishing the CLI package to npm so releases no longer require a manual `npm publish` from a developer machine.
+
+### `.github/workflows/publish.yml`
+**Why it exists:** Removes the manual, error-prone npm publish step from the release process. Tying the workflow to git tags (`v*`) means a release is triggered by the same action that marks a version in git history, so the published npm version and the tagged commit can never drift apart.
+
+| Step | Purpose |
+|------|---------|
+| `Checkout repo` | Uses `actions/checkout@v4` to pull the tagged commit. |
+| `Set up Node.js` | Uses `actions/setup-node@v4` with Node 22 and `registry-url: https://registry.npmjs.org`, which also configures the local `.npmrc` for token-based auth used by the `Publish` step. |
+| `Install dependencies` | `npm ci` — installs the full monorepo workspace tree and runs the root `prepare` script (see `index.ts` below). |
+| `Build` | `npm run build` — builds both `packages/cli` and `packages/app` so the published tarball's `dist/` and `public/` (bundled frontend) are current. |
+| `Typecheck` | `npm run typecheck --workspaces` — fails the workflow before publishing if either workspace has type errors. |
+| `Publish` | `npm publish --access public` run with `working-directory: packages/cli`, so only the `synapse-map` CLI package (not the private workspace root or the `app` package) is published. Auth comes from `NODE_AUTH_TOKEN`, sourced from the `NPM_TOKEN` repository secret. |
+
+**Trigger:** `on: push: tags: - 'v*'` — the workflow only runs when a tag matching `v*` (e.g. `v0.2.0`) is pushed, not on every push to `main`. This keeps routine commits from triggering npm releases.
+
+---
+
 ## What's Next
 
 ```mermaid
 flowchart LR
-    subgraph Done ["✅ Done (#1–#22, #24)"]
+    subgraph Done ["✅ Done (#1–#22, #24–#25)"]
         T1["#1 Monorepo"]
         T2["#2 Types"]
         T3["#3 JSONL Reader"]
@@ -652,5 +672,6 @@ flowchart LR
         T21["#21 ScanProgress"]
         T22["#22 Vite Output + Static Serving"]
         T24["#24 Stop Hook Auto-Refresh"]
+        T25["#25 npm Publish Workflow"]
     end
 ```
