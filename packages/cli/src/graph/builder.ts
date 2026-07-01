@@ -28,29 +28,38 @@ export function mergeSession(
   fileHash: string,
 ): KnowledgeGraph {
   const now = new Date().toISOString();
-  const nodeIds: string[] = [];
+  // id → whether this session was newly counted for that node in this merge.
+  // Deduped by id: a topic and a project can slug to the same node.
+  const counted = new Map<string, boolean>();
 
   // ── Upsert concept nodes ────────────────────────────────────────────────────
   for (const label of result.topics) {
     const id = toSlug(label);
     if (!id) continue;
-    nodeIds.push(id);
-    upsertNode(graph, id, label, 'concept', session.sessionId, session.timestamp, now);
+    const isNew = upsertNode(graph, id, label, 'concept', session.sessionId, session.timestamp, now);
+    counted.set(id, (counted.get(id) ?? false) || isNew);
   }
 
   // ── Upsert project nodes ────────────────────────────────────────────────────
   for (const name of result.projects) {
     const id = toSlug(name);
     if (!id) continue;
-    nodeIds.push(id);
-    upsertNode(graph, id, name, 'project', session.sessionId, session.timestamp, now);
+    const isNew = upsertNode(graph, id, name, 'project', session.sessionId, session.timestamp, now);
+    counted.set(id, (counted.get(id) ?? false) || isNew);
   }
 
   // ── Upsert co-occurrence edges ──────────────────────────────────────────────
-  const edgeNodes = nodeIds;
+  const edgeNodes = Array.from(counted.keys());
   for (let i = 0; i < edgeNodes.length; i++) {
     for (let j = i + 1; j < edgeNodes.length; j++) {
       const [a, b] = [edgeNodes[i]!, edgeNodes[j]!].sort();
+
+      // If neither endpoint was newly counted, both nodes already carried this
+      // session in conversationRefs — meaning a previous merge of this same
+      // session already counted the pair. Skipping keeps re-processing
+      // (e.g. scan --force) from inflating edge weights.
+      if (!counted.get(a) && !counted.get(b)) continue;
+
       const edgeId = `${a}→${b}`;
 
       const existing = graph.edges[edgeId];
@@ -83,6 +92,9 @@ export function mergeSession(
   return graph;
 }
 
+// Returns true if this session was newly counted for the node (node created,
+// or sessionId appended to conversationRefs); false when the session had
+// already been counted by a previous merge.
 function upsertNode(
   graph: KnowledgeGraph,
   id: string,
@@ -91,7 +103,7 @@ function upsertNode(
   sessionId: string,
   sessionTimestamp: string,
   now: string,
-): void {
+): boolean {
   const existing = graph.nodes[id];
   if (existing) {
     // Only increment weight if this session hasn't been counted yet.
@@ -99,8 +111,11 @@ function upsertNode(
     if (!existing.conversationRefs.includes(sessionId)) {
       existing.weight += 1;
       existing.conversationRefs.push(sessionId);
+      existing.lastSeen = now;
+      return true;
     }
     existing.lastSeen = now;
+    return false;
   } else {
     graph.nodes[id] = {
       id,
@@ -112,5 +127,6 @@ function upsertNode(
       conversationRefs: [sessionId],
       metadata: {},
     } satisfies GraphNode;
+    return true;
   }
 }

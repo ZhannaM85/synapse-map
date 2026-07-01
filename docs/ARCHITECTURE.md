@@ -184,7 +184,7 @@ Added to `types.ts` so the interface lives with its input/output types. Future L
 | Export | Purpose |
 |--------|---------|
 | `toSlug(label)` | Converts a canonical label to a stable URL-safe node ID. Deterministic: same label always → same slug. Handles C++ → `cpp`, C# → `csharp`, Next.js → `next-js`, spaces → hyphens. |
-| `mergeSession(graph, session, result, fileHash)` | Upserts all topics and projects from one `ExtractionResult` into the graph. Increments `weight` and appends `sessionId` to `conversationRefs` for existing nodes (idempotent — duplicate session IDs are skipped). Creates `related` edges for every pair of nodes in the session, capped at 20 nodes to prevent O(n²) explosion on noisy sessions. Records the session in `processedSessions` with its file hash. |
+| `mergeSession(graph, session, result, fileHash)` | Upserts all topics and projects from one `ExtractionResult` into the graph. Increments `weight` and appends `sessionId` to `conversationRefs` for existing nodes (idempotent — duplicate session IDs are skipped). Creates `related` edges for pairs of nodes in the session; since #44 a pair is only counted when the session is newly counted for at least one endpoint, so re-processing a session (`scan --force`) never inflates edge weights, and node ids are deduped before pairing so a topic and project slugging to the same id can't create a self-edge. No per-session cap on pair generation yet — see #45. Records the session in `processedSessions` with its file hash. |
 
 **Edge ID format:** `[slugA]→[slugB]` with slugs sorted alphabetically — guarantees no duplicate edges regardless of extraction order.
 
